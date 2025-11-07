@@ -1,9 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Invoice, ChatMessage } from '../types';
 
-// Fix: Use process.env.API_KEY as per the guidelines.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 const fileToGenerativePart = async (file: File) => {
     const base64EncodedDataPromise = new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -46,6 +43,8 @@ const invoiceSchema = {
 
 
 export const extractInvoiceData = async (file: File): Promise<Omit<Invoice, 'id' | 'fileName'>> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
         throw new Error('Solo se admiten archivos de imagen y PDF para la extracción.');
     }
@@ -73,6 +72,8 @@ export const extractInvoiceData = async (file: File): Promise<Omit<Invoice, 'id'
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], invoices: Invoice[]): Promise<string> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
     const context = `
       Eres Indomable FacturIA, un asistente de contabilidad IA amigable y perspicaz.
       Tu objetivo es ayudar al usuario a entender sus datos financieros basados en las facturas de VENTA (lo que ha ganado) que ha subido.
