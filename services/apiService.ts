@@ -21,27 +21,40 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 const handleApiError = async (response: Response, defaultMessage: string): Promise<Error> => {
+    // Clone the response so we can read its body multiple times if needed (once for JSON, once for text)
+    const clonedResponse = response.clone();
+
+    // Prioritize parsing a JSON error message, as this is the expected format from our API
     try {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-            const errorData = await response.json();
-            return new Error(errorData.error || defaultMessage);
-        } else {
-            const errorText = await response.text();
-            // Provide a cleaner message for common Vercel errors
+        const errorData = await response.json();
+        if (errorData && typeof errorData.error === 'string') {
+            return new Error(errorData.error);
+        }
+    } catch (e) {
+        // If JSON parsing fails, the response is likely text or HTML from Vercel
+        try {
+            const errorText = await clonedResponse.text();
+
             if (errorText.includes('FUNCTION_INVOCATION_TIMEOUT')) {
                 return new Error('El análisis de la factura tardó demasiado (10s) y excedió el tiempo límite del servidor. Intenta con un archivo más pequeño o simple.');
             }
-             if (errorText.includes('A server error occurred') || response.status === 500) {
+            if (errorText.includes('A server error occurred')) {
                 return new Error('Ocurrió un error inesperado en el servidor. Por favor, revisa la configuración de Vercel (variables de entorno) y los logs de la función para más detalles.');
             }
-            return new Error(errorText || defaultMessage);
+            // If there's any other text, return it.
+            if (errorText) {
+                return new Error(errorText);
+            }
+        } catch (textErr) {
+            // This would happen if reading the body as text also fails, which is very unlikely.
+            // We'll fall through to the generic error.
         }
-    } catch (e) {
-        // Fallback if parsing the error response also fails
-        return new Error(`${defaultMessage} (Status: ${response.status})`);
     }
+    
+    // Fallback if the response was not JSON, had no specific text, or if the JSON was malformed/lacked an .error property
+    return new Error(`${defaultMessage} (Status: ${response.status})`);
 };
+
 
 export const processInvoice = async (file: File) => {
     const token = await getAuthToken();
