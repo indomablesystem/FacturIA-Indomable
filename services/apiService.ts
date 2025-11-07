@@ -2,6 +2,8 @@ import { getAuth } from 'firebase/auth';
 import { getFirebaseApp } from '../firebase/config';
 import { Invoice } from '../types';
 
+const API_TIMEOUT_MS = 15000; // 15-second client-side timeout
+
 const getAuthToken = async (): Promise<string> => {
     const app = await getFirebaseApp();
     const auth = getAuth(app);
@@ -50,42 +52,68 @@ const handleApiError = async (response: Response, defaultMessage: string): Promi
 
 export const processInvoice = async (downloadUrl: string, mimeType: string) => {
     const token = await getAuthToken();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-    const response = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-            downloadUrl,
-            mimeType
-        })
-    });
+    try {
+        const response = await fetch('/api/invoices', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                downloadUrl,
+                mimeType
+            }),
+            signal: controller.signal
+        });
 
-    if (!response.ok) {
-        throw await handleApiError(response, 'Failed to process invoice.');
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw await handleApiError(response, 'Failed to process invoice.');
+        }
+
+        return response.json();
+    } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('El análisis de la factura tardó demasiado y la solicitud fue cancelada. Por favor, intenta de nuevo con un archivo más pequeño o revisa tu conexión.');
+        }
+        throw error;
     }
-
-    return response.json();
 };
 
 export const sendChatMessage = async (message: string, invoices: any[]): Promise<string> => {
     const token = await getAuthToken();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-    const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ message, invoicesContext: invoices })
-    });
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ message, invoicesContext: invoices }),
+            signal: controller.signal
+        });
 
-    if (!response.ok) {
-        throw await handleApiError(response, 'Failed to get chat response.');
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw await handleApiError(response, 'Failed to get chat response.');
+        }
+        
+        const data = await response.json();
+        return data.response;
+    } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('La solicitud al asistente de IA tardó demasiado y fue cancelada. Por favor, intenta de nuevo.');
+        }
+        throw error;
     }
-    
-    const data = await response.json();
-    return data.response;
 };
