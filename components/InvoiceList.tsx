@@ -24,6 +24,33 @@ const safeFormatDate = (dateStr: string, locale: string): string => {
     return date.toLocaleDateString(locale, { timeZone: 'UTC' });
 };
 
+/**
+ * A robust currency formatting function that prevents the UI from crashing
+ * due to invalid currency codes.
+ * @param amount - The number to format.
+ * @param currencyCode - The ISO 4217 currency code (e.g., "USD", "EUR").
+ * @param locale - The locale string (e.g., "en-US", "es-ES").
+ * @returns A formatted currency string.
+ */
+const safeFormatCurrency = (amount: number, currencyCode: string, locale: string): string => {
+    try {
+        // The `currency` property must be a valid ISO 4217 currency code.
+        return new Intl.NumberFormat(locale, {
+            style: 'currency',
+            currency: currencyCode || 'EUR', // Fallback to EUR if code is null/undefined
+        }).format(amount);
+    } catch (e) {
+        // This catch block handles errors from invalid currency codes (e.g., "Euros" instead of "EUR").
+        console.warn(`Invalid currency code "${currencyCode}" detected. Falling back to EUR for formatting.`);
+        // Fallback to a known valid currency to prevent a crash.
+        return new Intl.NumberFormat(locale, {
+            style: 'currency',
+            currency: 'EUR',
+        }).format(amount);
+    }
+};
+
+
 const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const { language, t } = useLanguage();
@@ -128,8 +155,8 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete })
                                 <td className="p-3 font-medium text-white">{invoice.cliente}</td>
                                 <td className="p-3 text-gray-300">{invoice.invoiceNumber}</td>
                                 <td className="p-3 text-gray-300">{safeFormatDate(invoice.date, locale)}</td>
-                                <td className="p-3 text-right text-red-400">{new Intl.NumberFormat(locale, { style: 'currency', currency: invoice.currency || 'EUR' }).format(invoice.irpfAmount || 0)}</td>
-                                <td className="p-3 text-right font-semibold text-white">{new Intl.NumberFormat(locale, { style: 'currency', currency: invoice.currency || 'EUR' }).format(invoice.totalAmount)}</td>
+                                <td className="p-3 text-right text-red-400">{safeFormatCurrency(invoice.irpfAmount || 0, invoice.currency, locale)}</td>
+                                <td className="p-3 text-right font-semibold text-white">{safeFormatCurrency(invoice.totalAmount, invoice.currency, locale)}</td>
                                 <td className="p-3 text-center">
                                     <div className="flex justify-center items-center gap-2">
                                         <button 
