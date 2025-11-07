@@ -1,6 +1,6 @@
-
 import React, { useState, useCallback } from 'react';
 import { UploadIcon, SpinnerIcon } from './icons';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface InvoiceUploaderProps {
     onFileUpload: (file: File) => void;
@@ -9,6 +9,7 @@ interface InvoiceUploaderProps {
 
 const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ onFileUpload, isProcessing }) => {
     const [isDragging, setIsDragging] = useState(false);
+    const { t } = useLanguage();
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
@@ -63,15 +64,15 @@ const InvoiceUploader: React.FC<InvoiceUploaderProps> = ({ onFileUpload, isProce
                 {isProcessing ? (
                     <div className="flex flex-col items-center text-center">
                         <SpinnerIcon />
-                        <p className="mt-4 text-lg font-semibold text-gray-300">Analizando Factura...</p>
-                        <p className="text-sm text-gray-400">Esto puede tardar un momento.</p>
+                        <p className="mt-4 text-lg font-semibold text-gray-300">{t('analyzing_invoice')}</p>
+                        <p className="text-sm text-gray-400">{t('this_may_take_a_moment')}</p>
                     </div>
                 ) : (
                     <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-full cursor-pointer text-center p-4">
                         <UploadIcon />
-                        <p className="mt-4 text-lg font-semibold text-gray-300">Arrastra y suelta tu factura aquí</p>
-                        <p className="text-sm text-gray-400">o <span className="text-accent font-medium">haz clic para buscar</span></p>
-                        <p className="mt-2 text-xs text-gray-500">Soporta: PDF, PNG, JPG, WEBP</p>
+                        <p className="mt-4 text-lg font-semibold text-gray-300">{t('drop_invoice_here')}</p>
+                        <p className="text-sm text-gray-400">{t('click_to_browse_pre')} <span className="text-accent font-medium">{t('click_to_browse_link')}</span></p>
+                        <p className="mt-2 text-xs text-gray-500">{t('supports')} PDF, PNG, JPG, WEBP</p>
                     </label>
                 )}
             </div>

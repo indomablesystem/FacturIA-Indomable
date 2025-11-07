@@ -1,7 +1,7 @@
-
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Invoice } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface DashboardProps {
     invoices: Invoice[];
@@ -19,41 +19,39 @@ const procesarIngresosPorCliente = (invoices: Invoice[]) => {
         .sort((a, b) => b.value - a.value);
 };
 
-const procesarIngresosPorTiempo = (invoices: Invoice[]) => {
+const procesarIngresosPorTiempo = (invoices: Invoice[], language: string) => {
+    const locale = language === 'es' ? 'es-ES' : 'en-US';
     const ingresos = invoices.reduce((acc, inv) => {
-        const month = new Date(inv.date).toLocaleString('es-ES', { month: 'short', year: '2-digit' });
-        acc[month] = (acc[month] || 0) + inv.totalAmount;
+        const date = new Date(inv.date);
+        const month = date.toLocaleString(locale, { month: 'short', year: '2-digit' });
+        if (!acc[month]) {
+            acc[month] = { total: 0, date: date };
+        }
+        acc[month].total += inv.totalAmount;
         return acc;
-    }, {} as { [key: string]: number });
+    }, {} as { [key: string]: { total: number, date: Date } });
 
-    const monthMap: { [key: string]: number } = { 'ene.': 0, 'feb.': 1, 'mar.': 2, 'abr.': 3, 'may.': 4, 'jun.': 5, 'jul.': 6, 'ago.': 7, 'sep.': 8, 'oct.': 9, 'nov.': 10, 'dic.': 11 };
-    
-    const sortedMonths = Object.keys(ingresos).sort((a, b) => {
-        const [aMonthStr, aYear] = a.replace('.', '').split(' ');
-        const [bMonthStr, bYear] = b.replace('.', '').split(' ');
-        const aMonthIndex = monthMap[aMonthStr + '.'] ?? -1;
-        const bMonthIndex = monthMap[bMonthStr + '.'] ?? -1;
-        const aDate = new Date(parseInt(`20${aYear}`), aMonthIndex);
-        const bDate = new Date(parseInt(`20${bYear}`), bMonthIndex);
-        return aDate.getTime() - bDate.getTime();
-    });
-
-    return sortedMonths.map(month => ({ name: month, ingreso: ingresos[month] }));
+    return Object.entries(ingresos)
+        .sort(([, a], [, b]) => a.date.getTime() - b.date.getTime())
+        .map(([name, { total }]) => ({ name, ingreso: total }));
 };
 
 
 const Dashboard: React.FC<DashboardProps> = ({ invoices }) => {
+    const { language, t } = useLanguage();
+    const locale = language === 'es' ? 'es-ES' : 'en-US';
+
     const totalIngresado = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
     const totalIRPF = invoices.reduce((sum, inv) => sum + (inv.irpfAmount || 0), 0);
     const valorPromedioFactura = invoices.length > 0 ? totalIngresado / invoices.length : 0;
     const ingresosPorClienteData = procesarIngresosPorCliente(invoices);
-    const ingresosPorTiempoData = procesarIngresosPorTiempo(invoices);
+    const ingresosPorTiempoData = procesarIngresosPorTiempo(invoices, language);
 
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
             return (
                 <div className="bg-secondary p-2 border border-gray-700 rounded-lg shadow-lg">
-                    <p className="label text-light">{`${label} : ${new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(payload[0].value)}`}</p>
+                    <p className="label text-light">{`${label} : ${new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format(payload[0].value)}`}</p>
                 </div>
             );
         }
@@ -64,15 +62,15 @@ const Dashboard: React.FC<DashboardProps> = ({ invoices }) => {
         <div className="space-y-6 animate-fade-in">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Total Facturado" value={totalIngresado.toFixed(2)} isCurrency />
-                <StatCard title="Total Facturas" value={invoices.length.toString()} />
-                <StatCard title="Valor Promedio Factura" value={valorPromedioFactura.toFixed(2)} isCurrency />
-                <StatCard title="Total IRPF Retenido" value={totalIRPF.toFixed(2)} isCurrency isNegative />
+                <StatCard title={t('total_invoiced')} value={totalIngresado.toFixed(2)} isCurrency locale={locale} />
+                <StatCard title={t('total_invoices_count')} value={invoices.length.toString()} locale={locale} />
+                <StatCard title={t('average_invoice_value')} value={valorPromedioFactura.toFixed(2)} isCurrency locale={locale} />
+                <StatCard title={t('total_irpf_withheld')} value={totalIRPF.toFixed(2)} isCurrency isNegative locale={locale} />
             </div>
 
             {/* Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChartContainer title="Ingresos por Cliente">
+                <ChartContainer title={t('revenue_by_client')}>
                     <ResponsiveContainer width="100%" height={300}>
                         <PieChart>
                             <Pie data={ingresosPorClienteData.slice(0, 5)} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} fill="#F5821F" label>
@@ -86,14 +84,14 @@ const Dashboard: React.FC<DashboardProps> = ({ invoices }) => {
                     </ResponsiveContainer>
                 </ChartContainer>
 
-                <ChartContainer title="Ingresos a lo largo del tiempo">
+                <ChartContainer title={t('revenue_over_time')}>
                     <ResponsiveContainer width="100%" height={300}>
                         <BarChart data={ingresosPorTiempoData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                             <XAxis dataKey="name" stroke="#9CA3AF" />
-                            <YAxis stroke="#9CA3AF" tickFormatter={(value) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value as number)} />
+                            <YAxis stroke="#9CA3AF" tickFormatter={(value) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', notation: 'compact' }).format(value as number)} />
                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(245, 130, 31, 0.2)' }}/>
-                            <Bar dataKey="ingreso" fill="#F5821F" />
+                            <Bar dataKey="ingreso" name={t('revenue')} fill="#F5821F" />
                         </BarChart>
                     </ResponsiveContainer>
                 </ChartContainer>
@@ -102,11 +100,11 @@ const Dashboard: React.FC<DashboardProps> = ({ invoices }) => {
     );
 };
 
-const StatCard: React.FC<{ title: string; value: string; isCurrency?: boolean; isNegative?: boolean }> = ({ title, value, isCurrency, isNegative }) => (
+const StatCard: React.FC<{ title: string; value: string; isCurrency?: boolean; isNegative?: boolean; locale: string }> = ({ title, value, isCurrency, isNegative, locale }) => (
     <div className="bg-secondary rounded-xl p-6 shadow-lg border border-gray-800">
         <h3 className="text-gray-400 text-sm font-medium">{title}</h3>
         <p className={`text-3xl font-bold mt-1 ${isNegative ? 'text-red-400' : 'text-white'}`}>
-            {isCurrency && '€'}{isCurrency ? new Intl.NumberFormat('es-ES').format(parseFloat(value)) : value}
+            {isCurrency ? new Intl.NumberFormat(locale, {style: 'currency', currency: 'EUR'}).format(parseFloat(value)) : value}
         </p>
     </div>
 );

@@ -7,7 +7,7 @@ export interface LineItem {
 }
 
 export interface Invoice {
-    id: string;
+    id: string; // Document ID from Firestore
     fileName: string;
     cliente: string;
     invoiceNumber: string;
@@ -19,6 +19,8 @@ export interface Invoice {
     currency: string;
     lineItems: LineItem[];
 }
+
+export type InvoiceData = Omit<Invoice, 'id'>;
 
 export interface ChatMessage {
     id: string;

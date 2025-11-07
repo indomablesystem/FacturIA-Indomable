@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "react": "^19.2.0",
-    "@google/genai": "^1.28.0",
     "react-dom": "^19.2.0",
-    "recharts": "^3.3.0"
+    "recharts": "^3.3.0",
+    "@google/genai": "^1.29.0",
+    "firebase": "^12.5.0",
+    "firebase-admin": "^13.6.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

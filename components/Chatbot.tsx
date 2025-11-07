@@ -1,7 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage } from '../types';
 import { SendIcon, CloseIcon, BotIcon, UserIcon, SpinnerIcon } from './icons';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface ChatbotProps {
     isOpen: boolean;
@@ -10,8 +10,10 @@ interface ChatbotProps {
 }
 
 const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, getBotResponse }) => {
+    const { t } = useLanguage();
+    
     const [messages, setMessages] = useState<ChatMessage[]>([
-        { id: 'initial', text: "¡Hola! Soy Indomable FacturIA, tu asistente de IA. Pregúntame lo que quieras sobre tus facturas.", sender: 'bot' }
+        { id: 'initial', text: t('chatbot_greeting'), sender: 'bot' }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -20,6 +22,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, getBotResponse }) =>
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
+
+    useEffect(() => {
+        // Update initial message if language changes and chat is reset
+        setMessages([{ id: 'initial', text: t('chatbot_greeting'), sender: 'bot' }]);
+    }, [t]);
 
     useEffect(scrollToBottom, [messages]);
 
@@ -37,7 +44,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, getBotResponse }) =>
             setMessages(prev => [...prev, botMessage]);
         } catch (error) {
             console.error("Chatbot error:", error);
-            const errorMessage: ChatMessage = { id: (Date.now() + 1).toString(), text: "Lo siento, he encontrado un error. Por favor, inténtalo de nuevo.", sender: 'bot' };
+            const errorMessage: ChatMessage = { id: (Date.now() + 1).toString(), text: t('chatbot_error'), sender: 'bot' };
             setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
@@ -49,7 +56,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, getBotResponse }) =>
     return (
         <div className="fixed bottom-20 right-6 w-[calc(100%-3rem)] sm:w-96 h-[60vh] max-h-[700px] bg-secondary shadow-2xl rounded-2xl flex flex-col z-50 animate-slide-in border border-gray-700">
             <div className="flex items-center justify-between p-4 border-b border-gray-700">
-                <h3 className="text-lg font-bold text-white">Asistente IA</h3>
+                <h3 className="text-lg font-bold text-white">{t('ai_assistant')}</h3>
                 <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
                     <CloseIcon />
                 </button>
@@ -83,7 +90,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, getBotResponse }) =>
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Pregunta sobre tus finanzas..."
+                        placeholder={t('ask_about_finances')}
                         className="w-full bg-primary border border-gray-600 rounded-full py-2 pl-4 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-accent"
                         disabled={isLoading}
                     />

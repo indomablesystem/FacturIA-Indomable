@@ -1,6 +1,7 @@
 import React from 'react';
 import { Invoice } from '../types';
 import { CloseIcon } from './icons';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface InvoiceDetailModalProps {
     invoice: Invoice;
@@ -8,9 +9,11 @@ interface InvoiceDetailModalProps {
 }
 
 const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, onClose }) => {
+    const { language, t } = useLanguage();
+    const locale = language === 'es' ? 'es-ES' : 'en-US';
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-ES', { style: 'currency', currency: invoice.currency || 'EUR' }).format(amount || 0);
+        return new Intl.NumberFormat(locale, { style: 'currency', currency: invoice.currency || 'EUR' }).format(amount || 0);
     };
 
     return (
@@ -23,7 +26,7 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, onClos
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex justify-between items-center p-4 border-b border-gray-700">
-                    <h2 className="text-xl font-bold text-white">Detalles de la Factura</h2>
+                    <h2 className="text-xl font-bold text-white">{t('invoice_details')}</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">
                         <CloseIcon />
                     </button>
@@ -32,44 +35,41 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, onClos
                 <div className="p-6 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6 text-sm">
                         <div>
-                            <p className="text-gray-400">Cliente</p>
+                            <p className="text-gray-400">{t('client')}</p>
                             <p className="text-white font-semibold">{invoice.cliente}</p>
                         </div>
                         <div>
-                            <p className="text-gray-400">Nº Factura</p>
+                            <p className="text-gray-400">{t('invoice_no')}</p>
                             <p className="text-white">{invoice.invoiceNumber}</p>
                         </div>
                         <div>
-                            <p className="text-gray-400">Fecha Emisión</p>
-                            <p className="text-white">{new Date(invoice.date).toLocaleDateString('es-ES')}</p>
+                            <p className="text-gray-400">{t('issue_date')}</p>
+                            <p className="text-white">{new Date(invoice.date).toLocaleDateString(locale)}</p>
                         </div>
                         <div>
-                            <p className="text-gray-400">Fecha Vencimiento</p>
-                            <p className="text-white">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('es-ES') : 'N/A'}</p>
+                            <p className="text-gray-400">{t('due_date')}</p>
+                            <p className="text-white">{invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString(locale) : 'N/A'}</p>
                         </div>
                          <div>
-                            <p className="text-gray-400">Total Impuestos (IVA)</p>
-                            <p className="text-white">{formatCurrency(invoice.taxAmount)}</p>
-                        </div>
-                        <div>
-                            <p className="text-gray-400">Total IRPF</p>
-                            <p className="text-red-400">{formatCurrency(invoice.irpfAmount)}</p>
+                            <p className="text-gray-400">{t('taxes')}</p>
+                            <p className="text-white">{t('vat')}: {formatCurrency(invoice.taxAmount)}</p>
+                            <p className="text-red-400">{t('irpf')}: {formatCurrency(invoice.irpfAmount)}</p>
                         </div>
                         <div className="text-lg md:col-start-3 md:row-start-2 md:text-right">
-                            <p className="text-gray-400">Importe Total</p>
+                            <p className="text-gray-400">{t('total_amount')}</p>
                             <p className="text-accent font-bold text-xl">{formatCurrency(invoice.totalAmount)}</p>
                         </div>
                     </div>
 
-                    <h3 className="text-lg font-bold text-white mb-2">Conceptos</h3>
+                    <h3 className="text-lg font-bold text-white mb-2">{t('concepts')}</h3>
                     <div className="overflow-x-auto border border-gray-700 rounded-lg">
                         <table className="w-full text-left">
                             <thead className="bg-primary/50 text-xs text-gray-400 uppercase">
                                 <tr>
-                                    <th className="p-3">Descripción</th>
-                                    <th className="p-3 text-right">Cantidad</th>
-                                    <th className="p-3 text-right">P. Unidad</th>
-                                    <th className="p-3 text-right">Total</th>
+                                    <th className="p-3">{t('description')}</th>
+                                    <th className="p-3 text-right">{t('quantity')}</th>
+                                    <th className="p-3 text-right">{t('unit_price')}</th>
+                                    <th className="p-3 text-right">{t('total')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -84,7 +84,7 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, onClos
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={4} className="p-4 text-center text-gray-400">No hay conceptos detallados.</td>
+                                        <td colSpan={4} className="p-4 text-center text-gray-400">{t('no_line_items')}</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -97,7 +97,7 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, onClos
                         onClick={onClose}
                         className="bg-accent text-white px-4 py-2 rounded-lg font-semibold hover:bg-accent-hover transition-colors"
                     >
-                        Cerrar
+                        {t('close')}
                     </button>
                 </div>
             </div>
