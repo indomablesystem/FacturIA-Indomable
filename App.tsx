@@ -1,243 +1,201 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Invoice, InvoiceData, View } from './types';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from './contexts/AuthContext';
+import { useLanguage } from './contexts/LanguageContext';
+import Login from './components/Login';
 import Header from './components/Header';
 import InvoiceUploader from './components/InvoiceUploader';
-import InvoiceList from './components/InvoiceList';
 import Dashboard from './components/Dashboard';
-import Chatbot from './components/Chatbot';
-import Login from './components/Login';
+import InvoiceList from './components/InvoiceList';
 import InvoiceDetailModal from './components/InvoiceDetailModal';
+import Chatbot from './components/Chatbot';
+import { BotIcon, FileTextIcon, SpinnerIcon, UploadIcon } from './components/icons';
+import { Invoice, View, ChatMessage } from './types';
+import { getInvoices, addInvoice, deleteInvoice } from './services/firestoreService';
 import { processInvoice, sendChatMessage } from './services/apiService';
-import { getInvoices, addInvoice, deleteInvoice as deleteInvoiceFromDb } from './services/firestoreService';
-import { BotIcon, SpinnerIcon } from './components/icons';
-import { useLanguage } from './contexts/LanguageContext';
-import { useAuth } from './contexts/AuthContext';
 
 const App: React.FC = () => {
+    // Hooks
     const { user, loadingAuth } = useAuth();
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [isProcessing, setIsProcessing] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
-    const [view, setView] = useState<View>(View.UPLOAD);
-    const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true);
-    const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const { t } = useLanguage();
-    const isInitialDataLoaded = useRef(false);
 
+    // State
+    const [view, setView] = useState<View>(View.UPLOAD);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+    const [loadingInvoices, setLoadingInvoices] = useState(true);
+
+    // Effects
     useEffect(() => {
         if (user) {
             setLoadingInvoices(true);
-            isInitialDataLoaded.current = false; // Reset for new user login
             const unsubscribe = getInvoices(
-                user.uid, 
-                (unsortedInvoices) => { // onSuccess callback
-                    
-                    const isValidDateString = (d: any): d is string => 
-                        typeof d === 'string' && d.trim() !== '' && !isNaN(new Date(d).getTime());
-
-                    const sanitizedInvoices = unsortedInvoices.map((inv): Invoice => ({
-                        id: inv.id || 'missing-id',
-                        fileName: inv.fileName || 'N/A',
-                        cliente: inv.cliente || 'Cliente Desconocido',
-                        invoiceNumber: inv.invoiceNumber || 'N/A',
-                        date: isValidDateString(inv.date) ? inv.date : new Date().toISOString().split('T')[0],
-                        dueDate: isValidDateString(inv.dueDate) ? inv.dueDate : '',
-                        totalAmount: typeof inv.totalAmount === 'number' ? inv.totalAmount : 0,
-                        taxAmount: typeof inv.taxAmount === 'number' ? inv.taxAmount : 0,
-                        irpfAmount: typeof inv.irpfAmount === 'number' ? inv.irpfAmount : 0,
-                        currency: inv.currency || 'EUR',
-                        lineItems: Array.isArray(inv.lineItems) ? inv.lineItems : [],
-                    }));
-
-                    const newInvoices = sanitizedInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-                    setInvoices(prevInvoices => {
-                        if (!isInitialDataLoaded.current) {
-                            setView(newInvoices.length === 0 ? View.UPLOAD : View.DASHBOARD);
-                            isInitialDataLoaded.current = true;
-                        } else if (prevInvoices.length > 0 && newInvoices.length === 0) {
-                            setView(View.UPLOAD);
-                        }
-                        return newInvoices;
-                    });
+                user.uid,
+                (fetchedInvoices) => {
+                    setInvoices(fetchedInvoices);
+                    if (fetchedInvoices.length > 0 && view === View.UPLOAD) {
+                        setView(View.DASHBOARD);
+                    } else if (fetchedInvoices.length === 0) {
+                        setView(View.UPLOAD);
+                    }
                     setLoadingInvoices(false);
-                    setError(null); // Clear previous errors on success
                 },
-                (err) => { // onError callback
-                    console.error("Firestore error:", err);
+                (err) => {
+                    console.error(err);
                     setError(err.message);
                     setLoadingInvoices(false);
                 }
             );
             return () => unsubscribe();
-        } else if (!loadingAuth) {
+        } else {
             setInvoices([]);
-            setLoadingInvoices(false);
-            isInitialDataLoaded.current = false;
+            setView(View.UPLOAD); // Reset view on logout
         }
-    }, [user, loadingAuth]);
+    }, [user, view]);
 
-    const handleFileUpload = useCallback(async (file: File) => {
-        if (!user) {
-            setError("Debes iniciar sesión para subir facturas.");
-            return;
-        }
-        
-        // Vercel has a 4.5MB payload limit. Base64 encoding increases file size by ~33%.
-        // A 3MB limit provides a safe margin.
-        const MAX_FILE_SIZE_MB = 3;
-        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-            setError(`El archivo es demasiado grande. El tamaño máximo permitido es de ${MAX_FILE_SIZE_MB} MB para evitar exceder los límites del servidor.`);
-            return;
-        }
-
+    // Handlers
+    const handleFileUpload = async (file: File) => {
+        if (!user) return;
         setIsProcessing(true);
         setError(null);
         try {
-            const extractedData = await processInvoice(file);
-            
-            // This data is already sanitized by the serverless function, but we create the object for addInvoice.
-            const newInvoiceData: InvoiceData = {
-                fileName: file.name,
-                cliente: extractedData.cliente,
-                invoiceNumber: extractedData.invoiceNumber,
-                date: extractedData.date,
-                dueDate: extractedData.dueDate,
-                totalAmount: extractedData.totalAmount,
-                taxAmount: extractedData.taxAmount,
-                irpfAmount: extractedData.irpfAmount,
-                currency: extractedData.currency,
-                lineItems: extractedData.lineItems,
-            };
-
-            await addInvoice(user.uid, newInvoiceData);
-            setView(View.DASHBOARD);
-        } catch (err) {
-            console.error(err);
-            const errorMessage = err instanceof Error ? err.message : 'Error desconocido al analizar la factura.';
-            setError(`${t('error_processing_invoice')} ${errorMessage}`);
+            const invoiceData = await processInvoice(file);
+            await addInvoice(user.uid, { ...invoiceData, fileName: file.name });
+            // The useEffect will update the invoices list and change view to DASHBOARD
+        } catch (err: any) {
+            console.error("Error processing invoice:", err);
+            setError(err.message || t('error_processing_invoice'));
         } finally {
             setIsProcessing(false);
         }
-    }, [user, t]);
+    };
 
     const handleDeleteInvoice = async (invoiceId: string) => {
         if (!user) return;
-        try {
-            await deleteInvoiceFromDb(user.uid, invoiceId);
-        } catch (error) {
-            console.error("Error deleting invoice:", error);
-            setError("No se pudo eliminar la factura.");
+        // A simple confirm dialog, could be replaced with a nicer modal
+        if (window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+            try {
+                await deleteInvoice(user.uid, invoiceId);
+            } catch (err: any) {
+                console.error("Error deleting invoice:", err);
+                setError(err.message);
+            }
         }
     };
-
-    const handleViewInvoice = (invoice: Invoice) => {
-        setSelectedInvoice(invoice);
-    };
     
-    const getChatbotResponse = async (history: any[]) => {
-        if (!user) return "Por favor, inicia sesión para usar el chat.";
-        const lastUserMessage = history.filter(m => m.sender === 'user').pop()?.text || "";
-        return await sendChatMessage(lastUserMessage, invoices);
-    }
+    const getBotResponse = async (history: ChatMessage[]) => {
+        const lastMessage = history[history.length - 1].text;
+        return sendChatMessage(lastMessage, invoices);
+    };
 
+
+    // Render logic
     if (loadingAuth) {
         return (
-             <div className="min-h-screen bg-primary flex items-center justify-center text-white">
-                <div className="text-center">
-                    <SpinnerIcon className="w-12 h-12 mx-auto text-accent"/>
-                    <p className="mt-4 text-lg">Autenticando...</p>
-                </div>
+            <div className="min-h-screen bg-primary flex items-center justify-center">
+                <SpinnerIcon className="w-12 h-12" />
             </div>
         );
     }
-    
+
     if (!user) {
         return <Login />;
     }
-
-    const MainContent: React.FC = () => {
-        const hasInvoices = invoices.length > 0;
-
-        // If there's an error, display it prominently.
-        if (error && !isProcessing) { // Only show general errors if not processing a file
-             return <div className="w-full flex justify-center items-center text-center">
-                <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto">
-                    <strong className="font-bold">Error de Carga</strong>
-                    <span className="block mt-1">{error}</span>
-                    <p className="text-xs mt-2 text-gray-400">Intenta refrescar la página. Si el problema persiste, revisa las reglas de seguridad de Firestore.</p>
+    
+    const renderContent = () => {
+        if (loadingInvoices && invoices.length === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center text-center p-8 mt-10">
+                    <SpinnerIcon className="w-10 h-10 mb-4" />
+                    <p className="text-lg text-gray-300">Loading your invoices...</p>
                 </div>
-            </div>;
+            );
         }
-    
-        return (
-            <div className="p-4 sm:p-6 lg:p-8 animate-fade-in w-full">
-                {hasInvoices && (
-                    <div className="flex space-x-2 mb-6 border-b border-gray-700">
-                        <button onClick={() => setView(View.UPLOAD)} className={`py-2 px-4 font-medium transition-colors ${view === View.UPLOAD ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('upload_more')}</button>
-                        <button onClick={() => setView(View.DASHBOARD)} className={`py-2 px-4 font-medium transition-colors ${view === View.DASHBOARD ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('dashboard')}</button>
-                        <button onClick={() => setView(View.INVOICES)} className={`py-2 px-4 font-medium transition-colors ${view === View.INVOICES ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('all_invoices')}</button>
+
+        if (invoices.length === 0 && !isProcessing) {
+            return (
+                 <div className="flex-grow flex flex-col items-center justify-center text-center p-8">
+                    <div className="max-w-xl">
+                         <FileTextIcon className="w-16 h-16 text-accent mx-auto mb-4" />
+                         <h2 className="text-3xl font-bold text-white mb-2">{t('welcome_title')}</h2>
+                         <p className="text-gray-400 mb-6">{t('welcome_subtitle')}</p>
+                         <InvoiceUploader onFileUpload={handleFileUpload} isProcessing={isProcessing} />
                     </div>
-                )}
-    
-                {/* Content Area */}
-                <div className={!hasInvoices && view === View.UPLOAD ? "flex flex-col items-center justify-center text-center h-full" : ""}>
-                    {view === View.UPLOAD && (
-                        <>
-                            {!hasInvoices && (
-                                <div className="max-w-2xl mb-8">
-                                    <h2 className="text-4xl font-bold mb-4 text-white">{t('welcome_title')}</h2>
-                                    <p className="text-lg text-gray-300 mb-8">
-                                       {t('welcome_subtitle')}
-                                    </p>
-                                </div>
-                            )}
-                            <InvoiceUploader onFileUpload={handleFileUpload} isProcessing={isProcessing} />
-                        </>
-                    )}
-                    
-                    {view === View.DASHBOARD && hasInvoices && <Dashboard invoices={invoices} />}
-                    {view === View.INVOICES && hasInvoices && <InvoiceList invoices={invoices} onView={handleViewInvoice} onDelete={handleDeleteInvoice} />}
                 </div>
-    
-                {isProcessing && error && <p className="text-red-400 mt-4 animate-fade-in text-center">{error}</p>}
-                 {error && isProcessing && ( // Show processing-specific error under the uploader
-                    <div className="w-full flex justify-center items-center text-center mt-4">
-                        <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto">
-                           <p>{error}</p>
-                        </div>
-                    </div>
-                 )}
-            </div>
-        );
+            );
+        }
+
+        switch (view) {
+            case View.DASHBOARD:
+                return <Dashboard invoices={invoices} />;
+            case View.INVOICES:
+                return <InvoiceList invoices={invoices} onView={setSelectedInvoice} onDelete={handleDeleteInvoice} />;
+            case View.UPLOAD:
+            default:
+                 // Show uploader, but maybe within the main layout if invoices exist
+                 return <InvoiceUploader onFileUpload={handleFileUpload} isProcessing={isProcessing} />;
+        }
     };
 
+
     return (
-        <div className="min-h-screen bg-primary flex flex-col">
+        <div className="bg-primary min-h-screen text-light font-sans">
             <Header />
-            <main className="flex-grow container mx-auto px-4 flex">
-                {loadingInvoices ? (
-                    <div className="w-full flex justify-center items-center">
-                        <SpinnerIcon className="w-12 h-12 text-accent" />
+            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+                {invoices.length > 0 && (
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <nav className="flex items-center space-x-2 bg-secondary/50 p-1.5 rounded-lg">
+                            <button
+                                onClick={() => setView(View.DASHBOARD)}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${view === View.DASHBOARD ? 'bg-accent text-white' : 'text-gray-300 hover:bg-secondary'}`}
+                            >
+                                {t('dashboard')}
+                            </button>
+                            <button
+                                onClick={() => setView(View.INVOICES)}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${view === View.INVOICES ? 'bg-accent text-white' : 'text-gray-300 hover:bg-secondary'}`}
+                            >
+                                {t('all_invoices')}
+                            </button>
+                        </nav>
+                         <button
+                            onClick={() => setView(View.UPLOAD)}
+                            className="flex items-center gap-2 bg-accent text-white px-4 py-2 rounded-lg font-semibold hover:bg-accent-hover transition-colors w-full sm:w-auto justify-center"
+                        >
+                            <UploadIcon className="w-5 h-5" />
+                            <span>{t('upload_more')}</span>
+                        </button>
                     </div>
-                ) : (
-                    <MainContent />
                 )}
+                
+                {error && (
+                    <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4" role="alert">
+                        <span className="font-medium">Error:</span> {error}
+                        <button onClick={() => setError(null)} className="float-right font-bold text-lg">&times;</button>
+                    </div>
+                )}
+                
+                {renderContent()}
+
             </main>
-            <button
-                onClick={() => setIsChatOpen(!isChatOpen)}
-                className="fixed bottom-6 right-6 bg-accent text-white p-4 rounded-full shadow-lg hover:bg-accent-hover transform hover:scale-110 transition-all z-50"
-                aria-label="Abrir Asistente IA"
-            >
-                <BotIcon />
-            </button>
-            <Chatbot
-                isOpen={isChatOpen}
-                onClose={() => setIsChatOpen(false)}
-                getBotResponse={getChatbotResponse}
-            />
-            {selectedInvoice && <InvoiceDetailModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />}
+
+            {invoices.length > 0 && !isChatbotOpen && (
+                 <button 
+                    onClick={() => setIsChatbotOpen(true)}
+                    className="fixed bottom-6 right-6 w-16 h-16 bg-accent rounded-full shadow-lg flex items-center justify-center text-white hover:bg-accent-hover transition-colors transform hover:scale-110 z-40"
+                    aria-label="Open AI Assistant"
+                 >
+                     <BotIcon className="w-8 h-8"/>
+                 </button>
+            )}
+
+            <Chatbot isOpen={isChatbotOpen} onClose={() => setIsChatbotOpen(false)} getBotResponse={getBotResponse} />
+
+            {selectedInvoice && (
+                <InvoiceDetailModal invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
+            )}
         </div>
     );
 };
