@@ -20,20 +20,18 @@ const initializeFirebase = async (): Promise<FirebaseApp> => {
     const firebaseConfig = await fetchFirebaseConfig();
 
     if (!firebaseConfig) {
-        const errorMessage = "La configuración de Firebase no se pudo obtener del servidor. Asegúrate de que la variable de entorno FIREBASE_CONFIG esté correctamente configurada en Vercel.";
-        console.error(errorMessage);
-        document.body.innerHTML = `<div style="color: white; padding: 20px; font-family: sans-serif; background: #0D0E1C; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center;"><div><h1>Error de Configuración</h1><p>${errorMessage}</p><p>Por favor, revisa las instrucciones y la configuración de tu proyecto en Vercel.</p></div></div>`;
-        throw new Error(errorMessage);
+        throw new Error("La configuración de Firebase no se pudo obtener del servidor. Asegúrate de que la variable de entorno FIREBASE_CONFIG esté correctamente configurada en Vercel.");
+    }
+
+    if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+        throw new Error("La configuración de Firebase obtenida es inválida o incompleta. Faltan campos clave como 'apiKey', 'authDomain' o 'projectId'.");
     }
 
     try {
-        if (!firebaseConfig.apiKey) {
-            throw new Error("La configuración de Firebase no es válida o le falta la apiKey.");
-        }
         return initializeApp(firebaseConfig);
     } catch (error) {
         console.error("La inicialización de Firebase ha fallado:", error);
-        throw error;
+        throw new Error("La inicialización de Firebase ha fallado. Revisa la consola del navegador para más detalles sobre el error de configuración.");
     }
 };
 

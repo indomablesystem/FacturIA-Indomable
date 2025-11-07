@@ -19,26 +19,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [initError, setInitError] = useState<string | null>(null);
 
     useEffect(() => {
+        let unsubscribe: (() => void) | undefined;
+
         getFirebaseApp()
             .then(app => {
                 const auth = getAuth(app);
                 setAuthInstance(auth);
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     setUser(currentUser);
                     setLoadingAuth(false);
                 });
-                return () => unsubscribe();
             })
             .catch(err => {
                 console.error("Failed to initialize Firebase Auth", err);
-                setInitError("No se pudo inicializar la autenticación. Revisa la configuración del proyecto en Vercel.");
+                const baseMessage = "No se pudo inicializar la autenticación.";
+                const userMessage = (err instanceof Error) ? err.message : "Error desconocido.";
+                const fullError = `${baseMessage} ${userMessage} Asegúrate de que la configuración en Vercel sea correcta y que el dominio '${window.location.hostname}' esté añadido a los 'dominios autorizados' en la consola de Firebase Authentication.`;
+                setInitError(fullError);
                 setLoadingAuth(false);
             });
+            
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
     }, []);
 
     const login = async () => {
         if (!authInstance) {
             console.error("Intento de login fallido: la instancia de autenticación no está lista.");
+            setInitError("El servicio de autenticación no está listo. Por favor, refresca la página.");
             return;
         }
         const provider = new GoogleAuthProvider();
