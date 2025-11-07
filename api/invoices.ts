@@ -133,9 +133,29 @@ export default async function handler(req: any, res: any) {
         });
         
         const jsonText = response.text.trim();
-        const parsedData = JSON.parse(jsonText);
+        let parsedData = JSON.parse(jsonText);
+        
+        // --- START: Server-Side Data Sanitization ---
+        // Ensures data stored in Firestore is clean and consistent.
+        const isValidDateString = (dateStr: any) => {
+            if (typeof dateStr !== 'string' || dateStr.trim() === '') return false;
+            return !isNaN(new Date(dateStr).getTime());
+        };
 
-        res.status(200).json(parsedData);
+        const sanitizedData = {
+            cliente: parsedData.cliente || "N/A",
+            invoiceNumber: parsedData.invoiceNumber || "N/A",
+            date: isValidDateString(parsedData.date) ? parsedData.date : new Date().toISOString().split('T')[0],
+            dueDate: isValidDateString(parsedData.dueDate) ? parsedData.dueDate : "",
+            totalAmount: Number(parsedData.totalAmount) || 0,
+            taxAmount: Number(parsedData.taxAmount) || 0,
+            irpfAmount: Number(parsedData.irpfAmount) || 0,
+            currency: parsedData.currency || "EUR",
+            lineItems: Array.isArray(parsedData.lineItems) ? parsedData.lineItems : []
+        };
+        // --- END: Server-Side Data Sanitization ---
+
+        res.status(200).json(sanitizedData);
 
     } catch (error) {
         console.error('Error processing invoice with Gemini:', error);

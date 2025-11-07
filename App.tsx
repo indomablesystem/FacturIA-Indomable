@@ -32,15 +32,17 @@ const App: React.FC = () => {
             const unsubscribe = getInvoices(
                 user.uid, 
                 (unsortedInvoices) => { // onSuccess callback
-                    // Sanitize all incoming invoices to prevent crashes in child components
-                    // due to potentially missing fields from older data structures.
+                    
+                    const isValidDateString = (d: any): d is string => 
+                        typeof d === 'string' && d.trim() !== '' && !isNaN(new Date(d).getTime());
+
                     const sanitizedInvoices = unsortedInvoices.map((inv): Invoice => ({
                         id: inv.id || 'missing-id',
                         fileName: inv.fileName || 'N/A',
                         cliente: inv.cliente || 'Cliente Desconocido',
                         invoiceNumber: inv.invoiceNumber || 'N/A',
-                        date: inv.date || new Date().toISOString().split('T')[0],
-                        dueDate: inv.dueDate || '',
+                        date: isValidDateString(inv.date) ? inv.date : new Date().toISOString().split('T')[0],
+                        dueDate: isValidDateString(inv.dueDate) ? inv.dueDate : '',
                         totalAmount: typeof inv.totalAmount === 'number' ? inv.totalAmount : 0,
                         taxAmount: typeof inv.taxAmount === 'number' ? inv.taxAmount : 0,
                         irpfAmount: typeof inv.irpfAmount === 'number' ? inv.irpfAmount : 0,
@@ -95,18 +97,18 @@ const App: React.FC = () => {
         try {
             const extractedData = await processInvoice(file);
             
-            // Sanitize data before saving to prevent Firestore errors from undefined values
+            // This data is already sanitized by the serverless function, but we create the object for addInvoice.
             const newInvoiceData: InvoiceData = {
                 fileName: file.name,
-                cliente: extractedData.cliente || 'N/A',
-                invoiceNumber: extractedData.invoiceNumber || 'N/A',
-                date: extractedData.date || new Date().toISOString().split('T')[0],
-                dueDate: extractedData.dueDate || '',
-                totalAmount: extractedData.totalAmount || 0,
-                taxAmount: extractedData.taxAmount || 0,
-                irpfAmount: extractedData.irpfAmount || 0,
-                currency: extractedData.currency || 'EUR',
-                lineItems: extractedData.lineItems || [],
+                cliente: extractedData.cliente,
+                invoiceNumber: extractedData.invoiceNumber,
+                date: extractedData.date,
+                dueDate: extractedData.dueDate,
+                totalAmount: extractedData.totalAmount,
+                taxAmount: extractedData.taxAmount,
+                irpfAmount: extractedData.irpfAmount,
+                currency: extractedData.currency,
+                lineItems: extractedData.lineItems,
             };
 
             await addInvoice(user.uid, newInvoiceData);
