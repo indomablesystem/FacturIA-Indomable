@@ -150,35 +150,43 @@ const App: React.FC = () => {
     // Handlers
     const handleFileUpload = async (file: File) => {
         if (!user) return;
-
+    
         // Vercel Hobby plan has a 4.5MB body limit. We check for 4MB to be safe.
-        if (file.size > 4 * 1024 * 1024) { 
+        if (file.size > 4 * 1024 * 1024) {
             setError(t('file_too_large'));
             return;
         }
-
+    
         setIsProcessing(true);
         setError(null);
+        let downloadUrl: string | undefined = undefined; // Initialize downloadUrl
+    
         try {
-            // Step 1: Convert file to base64. This is a quick local operation.
+            // Step 1: Convert file to base64 for AI processing.
             const base64Data = await fileToBase64(file);
-
-            // Step 2: Concurrently upload the original file to Storage and send the data for AI processing.
-            // This is much more efficient than doing them one after another.
-            const [downloadUrl, invoiceData] = await Promise.all([
-                uploadInvoiceFile(user.uid, file),
-                processInvoice(base64Data, file.type)
-            ]);
-
-            // Step 3: Once both operations are successful, save the combined result to Firestore.
+    
+            // Step 2: Process the invoice with the AI first. This is the critical step.
+            const invoiceData = await processInvoice(base64Data, file.type);
+    
+            // Step 3: (Optional) Try to upload the original file to storage.
+            // This is a non-critical step. If it fails, we'll proceed without the download URL.
+            try {
+                downloadUrl = await uploadInvoiceFile(user.uid, file);
+            } catch (uploadError: any) {
+                console.warn("Optional: Original file upload failed, but AI processing succeeded. Proceeding without download URL.", uploadError);
+                // The disabled download icon in the UI is sufficient feedback. No need to show a blocking error.
+            }
+    
+            // Step 4: Save the AI-extracted data (and the download URL if available) to Firestore.
             await addInvoice(user.uid, {
                 ...invoiceData,
                 fileName: file.name,
-                downloadUrl: downloadUrl
+                downloadUrl: downloadUrl // This will be undefined if the upload failed
             });
-
+    
         } catch (err: any) {
-            console.error("Error processing invoice:", err);
+            // This will catch critical errors, primarily from the `processInvoice` step.
+            console.error("Critical error processing invoice:", err);
             setError(err.message || t('error_processing_invoice'));
         } finally {
             setIsProcessing(false);
@@ -283,9 +291,11 @@ const App: React.FC = () => {
                 )}
                 
                 {error && (
-                    <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4" role="alert">
-                        <span className="font-medium">Error:</span> {error}
-                        <button onClick={() => setError(null)} className="float-right font-bold text-lg">&times;</button>
+                    <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4 flex justify-between items-center" role="alert">
+                        <div>
+                            <span className="font-medium">Error:</span> {error}
+                        </div>
+                        <button onClick={() => setError(null)} className="font-bold text-xl leading-none px-2">&times;</button>
                     </div>
                 )}
                 
