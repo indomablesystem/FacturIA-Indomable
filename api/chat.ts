@@ -1,6 +1,6 @@
 // Vercel Serverless Function: /api/chat.ts
 import { GoogleGenAI } from "@google/genai";
-import { getAdminAuth, isInitialized } from './_utils/firebase-admin';
+import { getAdminAuth, isInitialized } from './_utils/firebase-admin.js';
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {

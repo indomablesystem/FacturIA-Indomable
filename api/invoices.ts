@@ -1,6 +1,6 @@
 // Vercel Serverless Function: /api/invoices.ts
 import { GoogleGenAI, Type } from "@google/genai";
-import { getAdminAuth, isInitialized } from './_utils/firebase-admin';
+import { getAdminAuth, isInitialized } from './_utils/firebase-admin.js';
 
 // This function is the single entry point for invoice processing.
 export default async function handler(req: any, res: any) {
