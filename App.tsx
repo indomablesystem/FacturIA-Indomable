@@ -13,13 +13,77 @@ import { Invoice, View, ChatMessage } from './types';
 import { getInvoices, addInvoice, deleteInvoice } from './services/firestoreService';
 import { processInvoice, sendChatMessage } from './services/apiService';
 
+/**
+ * A robust sanitization function to ensure invoice data from any source (like Firestore)
+ * is clean, consistent, and safe for UI components to render. It handles various data types,
+ * especially different date formats (Firestore Timestamps, JS Dates, strings), and provides
+ * safe defaults for all properties.
+ * @param invoices - The raw array of invoices fetched from the database.
+ * @returns A new array of fully sanitized Invoice objects.
+ */
+const sanitizeInvoices = (invoices: any[]): Invoice[] => {
+    const today = new Date().toISOString().split('T')[0];
+
+    return invoices.map(inv => {
+        // Universal date handler for 'date' field
+        const sanitizeDate = (dateField: any): string => {
+            if (!dateField) return today;
+            if (dateField.toDate && typeof dateField.toDate === 'function') { // Firestore Timestamp
+                try { return dateField.toDate().toISOString().split('T')[0]; } catch (e) { return today; }
+            }
+            if (dateField instanceof Date) { // JavaScript Date Object
+                 try { return dateField.toISOString().split('T')[0]; } catch (e) { return today; }
+            }
+            if (typeof dateField === 'string' && !isNaN(new Date(dateField).getTime())) { // Valid Date String
+                return dateField.split('T')[0];
+            }
+            return today; // Fallback for any invalid format
+        };
+        
+        // Universal date handler for 'dueDate' field (can be empty)
+        const sanitizeDueDate = (dateField: any): string => {
+             if (!dateField) return '';
+            if (dateField.toDate && typeof dateField.toDate === 'function') { // Firestore Timestamp
+                try { return dateField.toDate().toISOString().split('T')[0]; } catch (e) { return ''; }
+            }
+             if (dateField instanceof Date) { // JavaScript Date Object
+                try { return dateField.toISOString().split('T')[0]; } catch (e) { return ''; }
+            }
+            if (typeof dateField === 'string' && !isNaN(new Date(dateField).getTime())) { // Valid Date String
+                return dateField.split('T')[0];
+            }
+            return ''; // Fallback for any invalid format
+        };
+
+        return {
+            id: inv.id || '',
+            fileName: inv.fileName || 'Unknown File',
+            cliente: inv.cliente || 'Cliente Desconocido',
+            invoiceNumber: inv.invoiceNumber || 'N/A',
+            date: sanitizeDate(inv.date),
+            dueDate: sanitizeDueDate(inv.dueDate),
+            totalAmount: Number(inv.totalAmount) || 0,
+            taxAmount: Number(inv.taxAmount) || 0,
+            irpfAmount: Number(inv.irpfAmount) || 0,
+            currency: inv.currency || 'EUR',
+            lineItems: Array.isArray(inv.lineItems) ? inv.lineItems.map(item => ({
+                description: item.description || '',
+                quantity: Number(item.quantity) || 0,
+                unitPrice: Number(item.unitPrice) || 0,
+                total: Number(item.total) || 0
+            })) : [],
+        };
+    });
+};
+
+
 const App: React.FC = () => {
     // Hooks
     const { user, loadingAuth } = useAuth();
     const { t } = useLanguage();
 
     // State
-    const [view, setView] = useState<View>(View.UPLOAD);
+    const [view, setView] = useState<View>(View.DASHBOARD);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -34,11 +98,15 @@ const App: React.FC = () => {
             const unsubscribe = getInvoices(
                 user.uid,
                 (fetchedInvoices) => {
-                    setInvoices(fetchedInvoices);
-                    if (fetchedInvoices.length > 0 && view === View.UPLOAD) {
-                        setView(View.DASHBOARD);
-                    } else if (fetchedInvoices.length === 0) {
-                        setView(View.UPLOAD);
+                    // CRITICAL: Sanitize data immediately after fetching and before setting state
+                    const sanitizedData = sanitizeInvoices(fetchedInvoices);
+                    setInvoices(sanitizedData);
+                    
+                    // Determine initial view based on sanitized data
+                    if (sanitizedData.length > 0) {
+                       setView(v => (v === View.UPLOAD ? View.DASHBOARD : v));
+                    } else {
+                       setView(View.UPLOAD);
                     }
                     setLoadingInvoices(false);
                 },
@@ -51,9 +119,10 @@ const App: React.FC = () => {
             return () => unsubscribe();
         } else {
             setInvoices([]);
-            setView(View.UPLOAD); // Reset view on logout
+            setView(View.UPLOAD);
+            setLoadingInvoices(false);
         }
-    }, [user, view]);
+    }, [user]);
 
     // Handlers
     const handleFileUpload = async (file: File) => {
@@ -63,7 +132,7 @@ const App: React.FC = () => {
         try {
             const invoiceData = await processInvoice(file);
             await addInvoice(user.uid, { ...invoiceData, fileName: file.name });
-            // The useEffect will update the invoices list and change view to DASHBOARD
+            // The onSnapshot listener from useEffect will automatically update the invoices list.
         } catch (err: any) {
             console.error("Error processing invoice:", err);
             setError(err.message || t('error_processing_invoice'));
@@ -74,7 +143,6 @@ const App: React.FC = () => {
 
     const handleDeleteInvoice = async (invoiceId: string) => {
         if (!user) return;
-        // A simple confirm dialog, could be replaced with a nicer modal
         if (window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
             try {
                 await deleteInvoice(user.uid, invoiceId);
@@ -105,7 +173,7 @@ const App: React.FC = () => {
     }
     
     const renderContent = () => {
-        if (loadingInvoices && invoices.length === 0) {
+        if (loadingInvoices) {
             return (
                 <div className="flex flex-col items-center justify-center text-center p-8 mt-10">
                     <SpinnerIcon className="w-10 h-10 mb-4" />
@@ -133,9 +201,9 @@ const App: React.FC = () => {
             case View.INVOICES:
                 return <InvoiceList invoices={invoices} onView={setSelectedInvoice} onDelete={handleDeleteInvoice} />;
             case View.UPLOAD:
-            default:
-                 // Show uploader, but maybe within the main layout if invoices exist
                  return <InvoiceUploader onFileUpload={handleFileUpload} isProcessing={isProcessing} />;
+            default:
+                 return <Dashboard invoices={invoices} />;
         }
     };
 

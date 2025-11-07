@@ -22,8 +22,15 @@ const procesarIngresosPorCliente = (invoices: Invoice[]) => {
 const procesarIngresosPorTiempo = (invoices: Invoice[], language: string) => {
     const locale = language === 'es' ? 'es-ES' : 'en-US';
     const ingresos = invoices.reduce((acc, inv) => {
-        const date = new Date(inv.date);
-        const month = date.toLocaleString(locale, { month: 'short', year: '2-digit' });
+        if (!inv.date || typeof inv.date !== 'string') {
+            return acc; // Defensively skip invoices with invalid or missing dates
+        }
+        // Parse date as UTC to avoid timezone-related shifts
+        const date = new Date(`${inv.date}T00:00:00Z`);
+        if (isNaN(date.getTime())) {
+            return acc; // Skip if the sanitized date string is somehow still invalid
+        }
+        const month = date.toLocaleString(locale, { month: 'short', year: '2-digit', timeZone: 'UTC' });
         if (!acc[month]) {
             acc[month] = { total: 0, date: date };
         }

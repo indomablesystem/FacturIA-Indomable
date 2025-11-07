@@ -9,16 +9,36 @@ interface InvoiceListProps {
     onDelete: (invoiceId: string) => void;
 }
 
+const safeFormatDate = (dateStr: string, locale: string): string => {
+    // Dates from sanitization are YYYY-MM-DD.
+    // To avoid timezone issues where this becomes the previous day,
+    // we parse and format it consistently as UTC.
+    if (!dateStr || typeof dateStr !== 'string') return 'N/A';
+    // Appending T00:00:00Z ensures it's parsed as UTC midnight
+    const date = new Date(`${dateStr}T00:00:00Z`);
+    if (isNaN(date.getTime())) {
+        return 'Fecha Inválida';
+    }
+    // Formatting with UTC timezone ensures the output matches the input date
+    return date.toLocaleDateString(locale, { timeZone: 'UTC' });
+};
+
 const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const { language, t } = useLanguage();
 
     const filteredInvoices = useMemo(() => {
+        const safeGetTime = (dateStr: string) => {
+            if (!dateStr || typeof dateStr !== 'string') return 0;
+            const date = new Date(dateStr);
+            return isNaN(date.getTime()) ? 0 : date.getTime();
+        };
+
         return invoices.filter(invoice =>
             invoice.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
             invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (invoice.lineItems && invoice.lineItems.some(item => item.description.toLowerCase().includes(searchTerm.toLowerCase())))
-        ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        ).sort((a, b) => safeGetTime(b.date) - safeGetTime(a.date));
     }, [invoices, searchTerm]);
 
     const exportToCSV = () => {
@@ -76,7 +96,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete })
                             <tr key={invoice.id} className="border-b border-gray-800 hover:bg-primary/50">
                                 <td className="p-3 font-medium text-white">{invoice.cliente}</td>
                                 <td className="p-3 text-gray-300">{invoice.invoiceNumber}</td>
-                                <td className="p-3 text-gray-300">{new Date(invoice.date).toLocaleDateString(locale)}</td>
+                                <td className="p-3 text-gray-300">{safeFormatDate(invoice.date, locale)}</td>
                                 <td className="p-3 text-right text-red-400">{new Intl.NumberFormat(locale, { style: 'currency', currency: invoice.currency || 'EUR' }).format(invoice.irpfAmount || 0)}</td>
                                 <td className="p-3 text-right font-semibold text-white">{new Intl.NumberFormat(locale, { style: 'currency', currency: invoice.currency || 'EUR' }).format(invoice.totalAmount)}</td>
                                 <td className="p-3 text-center">
