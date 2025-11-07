@@ -1,6 +1,6 @@
 // Vercel Serverless Function: /api/invoices.ts
 import { GoogleGenAI, Type } from "@google/genai";
-import { admin, isInitialized } from './_utils/firebase-admin';
+import { getAdminAuth, isInitialized } from './_utils/firebase-admin';
 
 // This function is the single entry point for invoice processing.
 export default async function handler(req: any, res: any) {
@@ -20,7 +20,11 @@ export default async function handler(req: any, res: any) {
         if (!token) {
             return res.status(401).json({ error: 'Unauthorized: No token provided.' });
         }
-        await admin.auth().verifyIdToken(token);
+        const auth = getAdminAuth();
+        if (!auth) {
+            return res.status(500).json({ error: 'Server configuration error: Authentication service is not available.' });
+        }
+        await auth.verifyIdToken(token);
     } catch (error) {
         console.error('Error verifying auth token:', error);
         return res.status(401).json({ error: 'Unauthorized: Invalid token.' });

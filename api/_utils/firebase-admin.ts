@@ -1,40 +1,60 @@
-import admin from 'firebase-admin';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getAuth, Auth } from 'firebase-admin/auth';
 
 let isInitialized = false;
 
 // Initialize the Firebase Admin SDK only if it hasn't been already.
-// This prevents re-initialization on every function invocation in a warm serverless environment.
-if (!admin.apps.length) {
+if (!getApps().length) {
   try {
     const serviceAccountString = process.env.ADMIN_CONFIG_JSON;
     if (!serviceAccountString) {
         throw new Error('The ADMIN_CONFIG_JSON environment variable is not set or is empty.');
     }
 
-    // A common user error is to paste a JS object (with unquoted keys)
-    // instead of a valid JSON string. This correction step makes the endpoint
-    // more robust by adding quotes around unquoted keys before parsing.
     const correctedJsonString = serviceAccountString.trim().replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
-    
     const serviceAccount = JSON.parse(correctedJsonString);
+
+    // Add crucial checks for essential properties before initializing
+    if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+        throw new Error('The parsed service account JSON is missing one or more required fields (project_id, private_key, client_email).');
+    }
     
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+    initializeApp({
+      credential: cert(serviceAccount)
     });
     isInitialized = true;
+    console.log("Firebase Admin SDK initialized successfully.");
     
   } catch (error: any) {
-    let errorMessage = 'Firebase Admin SDK initialization error: ';
+    let errorMessage = 'CRITICAL: Firebase Admin SDK initialization failed. ';
     if (error instanceof SyntaxError) {
         errorMessage += 'The ADMIN_CONFIG_JSON environment variable contains invalid JSON. Please ensure it is a valid, quoted JSON string.';
     } else {
         errorMessage += error.message;
     }
+    // Log detailed info to Vercel logs for easier debugging
     console.error(errorMessage);
-    // isInitialized remains false
+    console.error("Full initialization error object:", error);
   }
 } else {
     isInitialized = true;
 }
 
-export { admin, isInitialized };
+/**
+ * Gets the admin Auth instance safely.
+ * @returns The Auth instance if initialized, otherwise null.
+ */
+const getAdminAuth = (): Auth | null => {
+    if (isInitialized) {
+        try {
+            return getAuth();
+        } catch (e) {
+            console.error("Failed to get Firebase Auth instance even though app is initialized.", e);
+            return null;
+        }
+    }
+    return null;
+};
+
+// The `isInitialized` flag is the primary gatekeeper for its usage.
+export { getAdminAuth, isInitialized };

@@ -45,6 +45,15 @@ const App: React.FC = () => {
             setError("Debes iniciar sesión para subir facturas.");
             return;
         }
+        
+        // Vercel has a 4.5MB payload limit. Base64 encoding increases file size by ~33%.
+        // A 3MB limit provides a safe margin.
+        const MAX_FILE_SIZE_MB = 3;
+        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+            setError(`El archivo es demasiado grande. El tamaño máximo permitido es de ${MAX_FILE_SIZE_MB} MB para evitar exceder los límites del servidor.`);
+            return;
+        }
+
         setIsProcessing(true);
         setError(null);
         try {
