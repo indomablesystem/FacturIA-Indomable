@@ -1,10 +1,14 @@
 import { collection, addDoc, onSnapshot, query, where, doc, deleteDoc, serverTimestamp, orderBy, getFirestore, Firestore } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL, Storage } from "firebase/storage";
 import { getFirebaseApp } from '../firebase/config';
 import { Invoice, InvoiceData } from "../types";
 
 const INVOICES_COLLECTION = 'invoices';
+const INVOICE_FILES_FOLDER = 'invoice_files';
 
 let dbInstance: Firestore | null = null;
+let storageInstance: Storage | null = null;
+
 const getDb = async (): Promise<Firestore> => {
     if (!dbInstance) {
         const app = await getFirebaseApp();
@@ -12,6 +16,30 @@ const getDb = async (): Promise<Firestore> => {
     }
     return dbInstance;
 }
+
+const getStorageInstance = async (): Promise<Storage> => {
+    if (!storageInstance) {
+        const app = await getFirebaseApp();
+        storageInstance = getStorage(app);
+    }
+    return storageInstance;
+}
+
+export const uploadInvoiceFile = async (userId: string, file: File): Promise<string> => {
+    const storage = await getStorageInstance();
+    // Create a unique path for the file to prevent overwrites
+    const filePath = `${INVOICE_FILES_FOLDER}/${userId}/${Date.now()}-${file.name}`;
+    const fileRef = ref(storage, filePath);
+
+    try {
+        const snapshot = await uploadBytes(fileRef, file);
+        const downloadUrl = await getDownloadURL(snapshot.ref);
+        return downloadUrl;
+    } catch (error) {
+        console.error("Error uploading file to Firebase Storage:", error);
+        throw new Error("Failed to upload the invoice file. Please check Firebase Storage rules.");
+    }
+};
 
 export const getInvoices = (
     userId: string, 

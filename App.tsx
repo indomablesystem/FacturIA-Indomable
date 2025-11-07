@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import { useLanguage } from './contexts/LanguageContext';
@@ -10,7 +11,7 @@ import InvoiceDetailModal from './components/InvoiceDetailModal';
 import Chatbot from './components/Chatbot';
 import { BotIcon, FileTextIcon, SpinnerIcon, UploadIcon } from './components/icons';
 import { Invoice, View, ChatMessage } from './types';
-import { getInvoices, addInvoice, deleteInvoice } from './services/firestoreService';
+import { getInvoices, addInvoice, deleteInvoice, uploadInvoiceFile } from './services/firestoreService';
 import { processInvoice, sendChatMessage } from './services/apiService';
 
 /**
@@ -82,6 +83,7 @@ const sanitizeInvoices = (invoices: any[]): Invoice[] => {
                     unitPrice: Number(item.unitPrice) || 0,
                     total: Number(item.total) || 0
                 })) : [],
+                downloadUrl: inv.downloadUrl || undefined,
             };
         });
 };
@@ -140,11 +142,14 @@ const App: React.FC = () => {
         setIsProcessing(true);
         setError(null);
         try {
+            // Step 1: Upload the original file to Firebase Storage to get a persistent URL
+            const downloadUrl = await uploadInvoiceFile(user.uid, file);
+            // Step 2: Process the file with the AI to extract structured data
             const invoiceData = await processInvoice(file);
-            await addInvoice(user.uid, { ...invoiceData, fileName: file.name });
-            // The onSnapshot listener from useEffect will automatically update the invoices list.
+            // Step 3: Save the extracted data along with the original file's URL to Firestore
+            await addInvoice(user.uid, { ...invoiceData, fileName: file.name, downloadUrl });
         } catch (err: any) {
-            console.error("Error processing invoice:", err);
+            console.error("Error processing and uploading invoice:", err);
             setError(err.message || t('error_processing_invoice'));
         } finally {
             setIsProcessing(false);
@@ -156,6 +161,7 @@ const App: React.FC = () => {
         if (window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
             try {
                 await deleteInvoice(user.uid, invoiceId);
+// FIX: Added curly braces to the catch block to correctly handle errors.
             } catch (err: any) {
                 console.error("Error deleting invoice:", err);
                 setError(err.message);

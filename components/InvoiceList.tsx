@@ -158,7 +158,20 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete })
                                 <td className="p-3 text-right text-red-400">{safeFormatCurrency(invoice.irpfAmount || 0, invoice.currency, locale)}</td>
                                 <td className="p-3 text-right font-semibold text-white">{safeFormatCurrency(invoice.totalAmount, invoice.currency, locale)}</td>
                                 <td className="p-3 text-center">
-                                    <div className="flex justify-center items-center gap-2">
+                                    <div className="flex justify-center items-center gap-3">
+                                        {invoice.downloadUrl && (
+                                            <a
+                                                href={invoice.downloadUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                download={invoice.fileName}
+                                                className="text-green-400 hover:text-green-300 p-1 rounded-full transition-colors"
+                                                aria-label={t('download_original_invoice')}
+                                                title={t('download_original_invoice')}
+                                            >
+                                                <DownloadIcon />
+                                            </a>
+                                        )}
                                         <button 
                                             onClick={() => onView(invoice)} 
                                             className="text-blue-400 hover:text-blue-300 p-1 rounded-full transition-colors"

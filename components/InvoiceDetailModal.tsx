@@ -52,7 +52,6 @@ const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({ invoice, onClos
                         </div>
                          <div>
                             <p className="text-gray-400">{t('taxes')}</p>
-                            <p className="text-white">{t('vat')}: {formatCurrency(invoice.taxAmount)}</p>
                             <p className="text-red-400">{t('irpf')}: {formatCurrency(invoice.irpfAmount)}</p>
                         </div>
                         <div className="text-lg md:col-start-3 md:row-start-2 md:text-right">

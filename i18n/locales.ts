@@ -37,6 +37,7 @@ export const translations: Translations = {
         'view_invoice': 'Ver factura',
         'delete_invoice': 'Eliminar factura',
         'no_invoices_found': 'No se encontraron facturas.',
+        'download_original_invoice': 'Descargar factura original',
         // Modal
         'invoice_details': 'Detalles de la Factura',
         'issue_date': 'Fecha Emisión',
@@ -91,6 +92,7 @@ export const translations: Translations = {
         'view_invoice': 'View invoice',
         'delete_invoice': 'Delete invoice',
         'no_invoices_found': 'No invoices found.',
+        'download_original_invoice': 'Download original invoice',
         // Modal
         'invoice_details': 'Invoice Details',
         'issue_date': 'Issue Date',

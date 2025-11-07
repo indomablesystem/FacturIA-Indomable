@@ -1,4 +1,5 @@
 
+
 export interface LineItem {
     description: string;
     quantity: number;
@@ -18,6 +19,7 @@ export interface Invoice {
     irpfAmount: number;
     currency: string;
     lineItems: LineItem[];
+    downloadUrl?: string; // URL to the original file in Firebase Storage
 }
 
 export type InvoiceData = Omit<Invoice, 'id'>;
