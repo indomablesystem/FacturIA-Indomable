@@ -18,6 +18,7 @@ export const translations: Translations = {
         'dashboard': 'Panel',
         'all_invoices': 'Todas las Facturas',
         'error_processing_invoice': 'Error al analizar la factura.',
+        'file_too_large': 'El archivo es demasiado grande. El límite es de 4MB.',
         // Uploader
         'drop_invoice_here': 'Arrastra y suelta tu factura aquí',
         'click_to_browse_pre': 'o',
@@ -74,6 +75,7 @@ export const translations: Translations = {
         'dashboard': 'Dashboard',
         'all_invoices': 'All Invoices',
         'error_processing_invoice': 'Error processing invoice.',
+        'file_too_large': 'File is too large. The limit is 4MB.',
         // Uploader
         'drop_invoice_here': 'Drag and drop your invoice here',
         'click_to_browse_pre': 'or',

@@ -11,7 +11,7 @@ import InvoiceDetailModal from './components/InvoiceDetailModal';
 import Chatbot from './components/Chatbot';
 import { BotIcon, FileTextIcon, SpinnerIcon, UploadIcon } from './components/icons';
 import { Invoice, View, ChatMessage } from './types';
-import { getInvoices, addInvoice, deleteInvoice, uploadInvoiceFile } from './services/firestoreService';
+import { getInvoices, addInvoice, deleteInvoice } from './services/firestoreService';
 import { processInvoice, sendChatMessage } from './services/apiService';
 
 /**
@@ -88,6 +88,17 @@ const sanitizeInvoices = (invoices: any[]): Invoice[] => {
         });
 };
 
+const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            // result is "data:mime/type;base64,the_base64_string", we need to remove the prefix
+            resolve(result.split(',')[1]);
+        };
+        reader.onerror = error => reject(error);
+    });
 
 const App: React.FC = () => {
     // Hooks
@@ -139,17 +150,28 @@ const App: React.FC = () => {
     // Handlers
     const handleFileUpload = async (file: File) => {
         if (!user) return;
+
+        // Vercel Hobby plan has a 4.5MB body limit. We check for 4MB to be safe.
+        if (file.size > 4 * 1024 * 1024) { 
+            setError(t('file_too_large'));
+            return;
+        }
+
         setIsProcessing(true);
         setError(null);
         try {
-            // Step 1: Upload the original file to Firebase Storage to get a persistent URL
-            const downloadUrl = await uploadInvoiceFile(user.uid, file);
-            // Step 2: Send the URL to the backend for AI processing, avoiding large payload issues
-            const invoiceData = await processInvoice(downloadUrl, file.type);
-            // Step 3: Save the extracted data along with the original file's URL to Firestore
-            await addInvoice(user.uid, { ...invoiceData, fileName: file.name, downloadUrl });
+            // Step 1: Convert file to base64 to send it directly to the server
+            const base64Data = await fileToBase64(file);
+            
+            // Step 2: Send the file data to the backend for AI processing
+            const invoiceData = await processInvoice(base64Data, file.type);
+            
+            // Step 3: Save the extracted data to Firestore.
+            // Note: With this method, the original file is not stored, so downloadUrl is not available.
+            await addInvoice(user.uid, { ...invoiceData, fileName: file.name });
+
         } catch (err: any) {
-            console.error("Error processing and uploading invoice:", err);
+            console.error("Error processing invoice:", err);
             setError(err.message || t('error_processing_invoice'));
         } finally {
             setIsProcessing(false);

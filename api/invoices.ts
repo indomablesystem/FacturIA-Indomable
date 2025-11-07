@@ -80,27 +80,12 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ error: 'Internal server error during authentication.' });
     }
 
-    const { downloadUrl, mimeType } = req.body;
+    const { fileData, mimeType } = req.body;
 
-    if (!downloadUrl || !mimeType) {
-        return res.status(400).json({ error: 'Missing downloadUrl or mimeType in request body.' });
+    if (!fileData || !mimeType) {
+        return res.status(400).json({ error: 'Missing fileData or mimeType in request body.' });
     }
-
-    let fileData;
-    try {
-        // Fetch the file from the public URL provided by Firebase Storage
-        const fileResponse = await fetch(downloadUrl);
-        if (!fileResponse.ok) {
-            throw new Error(`Failed to download file from storage: ${fileResponse.statusText}`);
-        }
-        // Convert the file to a buffer, then to a base64 string
-        const fileBuffer = await fileResponse.arrayBuffer();
-        fileData = Buffer.from(fileBuffer).toString('base64');
-    } catch (error: any) {
-        console.error('Error fetching invoice file from URL:', error);
-        return res.status(500).json({ error: `Failed to retrieve invoice file from storage. ${error.message}` });
-    }
-
+    
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
         console.error("API_KEY environment variable is not set.");

@@ -50,7 +50,7 @@ const handleApiError = async (response: Response, defaultMessage: string): Promi
 };
 
 
-export const processInvoice = async (downloadUrl: string, mimeType: string) => {
+export const processInvoice = async (fileData: string, mimeType: string) => {
     const token = await getAuthToken();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
@@ -63,7 +63,7 @@ export const processInvoice = async (downloadUrl: string, mimeType: string) => {
                 'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-                downloadUrl,
+                fileData,
                 mimeType
             }),
             signal: controller.signal
