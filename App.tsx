@@ -10,7 +10,7 @@ import InvoiceList from './components/InvoiceList';
 import InvoiceDetailModal from './components/InvoiceDetailModal';
 import Chatbot from './components/Chatbot';
 import { BotIcon, FileTextIcon, SpinnerIcon, UploadIcon } from './components/icons';
-import { Invoice, View, ChatMessage } from './types';
+import { Invoice, View, ChatMessage, InvoiceData } from './types';
 import { getInvoices, addInvoice, deleteInvoice, uploadInvoiceFile } from './services/firestoreService';
 import { processInvoice, sendChatMessage } from './services/apiService';
 
@@ -159,34 +159,43 @@ const App: React.FC = () => {
     
         setIsProcessing(true);
         setError(null);
-        let downloadUrl: string | undefined = undefined; // Initialize downloadUrl
+        let downloadUrl: string | undefined = undefined;
     
         try {
-            // Step 1: Convert file to base64 for AI processing.
+            // Step 1: Convert file to base64 for AI processing. This is fast.
             const base64Data = await fileToBase64(file);
     
-            // Step 2: Process the invoice with the AI first. This is the critical step.
+            // Step 2: Process the invoice with the AI. This is the critical step.
             const invoiceData = await processInvoice(base64Data, file.type);
     
-            // Step 3: (Optional) Try to upload the original file to storage.
-            // This is a non-critical step. If it fails, we'll proceed without the download URL.
+            // Step 3: (Optional) Try to upload the original file. This can be slow.
             try {
                 downloadUrl = await uploadInvoiceFile(user.uid, file);
             } catch (uploadError: any) {
                 console.warn("Optional: Original file upload failed, but AI processing succeeded. Proceeding without download URL.", uploadError);
-                // The disabled download icon in the UI is sufficient feedback. No need to show a blocking error.
+                // No need to show an error. The UI will handle the missing URL gracefully.
             }
     
-            // Step 4: Save the AI-extracted data (and the download URL if available) to Firestore.
-            await addInvoice(user.uid, {
+            // Step 4: Prepare the final, clean invoice object for Firestore.
+            const finalInvoiceData: InvoiceData = {
                 ...invoiceData,
                 fileName: file.name,
-                downloadUrl: downloadUrl // This will be undefined if the upload failed
-            });
+            };
+    
+            // CRITICAL FIX: Only add the downloadUrl property if it's a valid string.
+            // Firestore throws an error if any field has an `undefined` value. This was the
+            // cause of the "No se pudo guardar la factura" error.
+            if (downloadUrl) {
+                finalInvoiceData.downloadUrl = downloadUrl;
+            }
+    
+            // Step 5: Save the clean data to Firestore. This should now be reliable.
+            await addInvoice(user.uid, finalInvoiceData);
     
         } catch (err: any) {
-            // This will catch critical errors, primarily from the `processInvoice` step.
-            console.error("Critical error processing invoice:", err);
+            // This block will catch critical errors, primarily from `processInvoice` or `addInvoice`.
+            console.error("Critical error during invoice handling:", err);
+            // Provide a user-friendly message based on the error.
             setError(err.message || t('error_processing_invoice'));
         } finally {
             setIsProcessing(false);
