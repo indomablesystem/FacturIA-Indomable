@@ -11,7 +11,7 @@ import InvoiceDetailModal from './components/InvoiceDetailModal';
 import Chatbot from './components/Chatbot';
 import { BotIcon, FileTextIcon, SpinnerIcon, UploadIcon } from './components/icons';
 import { Invoice, View, ChatMessage } from './types';
-import { getInvoices, addInvoice, deleteInvoice } from './services/firestoreService';
+import { getInvoices, addInvoice, deleteInvoice, uploadInvoiceFile } from './services/firestoreService';
 import { processInvoice, sendChatMessage } from './services/apiService';
 
 /**
@@ -160,15 +160,21 @@ const App: React.FC = () => {
         setIsProcessing(true);
         setError(null);
         try {
-            // Step 1: Convert file to base64 to send it directly to the server
+            // Step 1: Upload original file to Firebase Storage to get a download URL
+            const downloadUrl = await uploadInvoiceFile(user.uid, file);
+            
+            // Step 2: Convert file to base64 to send it to the server for processing
             const base64Data = await fileToBase64(file);
             
-            // Step 2: Send the file data to the backend for AI processing
+            // Step 3: Send the file data to the backend for AI processing
             const invoiceData = await processInvoice(base64Data, file.type);
             
-            // Step 3: Save the extracted data to Firestore.
-            // Note: With this method, the original file is not stored, so downloadUrl is not available.
-            await addInvoice(user.uid, { ...invoiceData, fileName: file.name });
+            // Step 4: Save the extracted data AND the downloadUrl to Firestore.
+            await addInvoice(user.uid, { 
+                ...invoiceData, 
+                fileName: file.name,
+                downloadUrl: downloadUrl 
+            });
 
         } catch (err: any) {
             console.error("Error processing invoice:", err);
