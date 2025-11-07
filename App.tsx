@@ -160,20 +160,21 @@ const App: React.FC = () => {
         setIsProcessing(true);
         setError(null);
         try {
-            // Step 1: Upload original file to Firebase Storage to get a download URL
-            const downloadUrl = await uploadInvoiceFile(user.uid, file);
-            
-            // Step 2: Convert file to base64 to send it to the server for processing
+            // Step 1: Convert file to base64. This is a quick local operation.
             const base64Data = await fileToBase64(file);
-            
-            // Step 3: Send the file data to the backend for AI processing
-            const invoiceData = await processInvoice(base64Data, file.type);
-            
-            // Step 4: Save the extracted data AND the downloadUrl to Firestore.
-            await addInvoice(user.uid, { 
-                ...invoiceData, 
+
+            // Step 2: Concurrently upload the original file to Storage and send the data for AI processing.
+            // This is much more efficient than doing them one after another.
+            const [downloadUrl, invoiceData] = await Promise.all([
+                uploadInvoiceFile(user.uid, file),
+                processInvoice(base64Data, file.type)
+            ]);
+
+            // Step 3: Once both operations are successful, save the combined result to Firestore.
+            await addInvoice(user.uid, {
+                ...invoiceData,
                 fileName: file.name,
-                downloadUrl: downloadUrl 
+                downloadUrl: downloadUrl
             });
 
         } catch (err: any) {
