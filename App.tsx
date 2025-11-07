@@ -144,8 +144,8 @@ const App: React.FC = () => {
         try {
             // Step 1: Upload the original file to Firebase Storage to get a persistent URL
             const downloadUrl = await uploadInvoiceFile(user.uid, file);
-            // Step 2: Process the file with the AI to extract structured data
-            const invoiceData = await processInvoice(file);
+            // Step 2: Send the URL to the backend for AI processing, avoiding large payload issues
+            const invoiceData = await processInvoice(downloadUrl, file.type);
             // Step 3: Save the extracted data along with the original file's URL to Firestore
             await addInvoice(user.uid, { ...invoiceData, fileName: file.name, downloadUrl });
         } catch (err: any) {
@@ -161,7 +161,6 @@ const App: React.FC = () => {
         if (window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
             try {
                 await deleteInvoice(user.uid, invoiceId);
-// FIX: Added curly braces to the catch block to correctly handle errors.
             } catch (err: any) {
                 console.error("Error deleting invoice:", err);
                 setError(err.message);

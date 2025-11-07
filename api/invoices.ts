@@ -1,5 +1,9 @@
 // Vercel Serverless Function: /api/invoices.ts
 import { GoogleGenAI, Type } from "@google/genai";
+// FIX: Add explicit import for Buffer to resolve TypeScript type error.
+// The Buffer object is available globally in Node.js environments (like Vercel serverless functions),
+// but importing it explicitly makes the dependency clear and helps with type checking.
+import { Buffer } from "buffer";
 
 /**
  * Verifies a Firebase Auth ID token using Google's Identity Toolkit REST API.
@@ -76,10 +80,25 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ error: 'Internal server error during authentication.' });
     }
 
-    const { fileData, mimeType } = req.body;
+    const { downloadUrl, mimeType } = req.body;
 
-    if (!fileData || !mimeType) {
-        return res.status(400).json({ error: 'Missing fileData or mimeType in request body.' });
+    if (!downloadUrl || !mimeType) {
+        return res.status(400).json({ error: 'Missing downloadUrl or mimeType in request body.' });
+    }
+
+    let fileData;
+    try {
+        // Fetch the file from the public URL provided by Firebase Storage
+        const fileResponse = await fetch(downloadUrl);
+        if (!fileResponse.ok) {
+            throw new Error(`Failed to download file from storage: ${fileResponse.statusText}`);
+        }
+        // Convert the file to a buffer, then to a base64 string
+        const fileBuffer = await fileResponse.arrayBuffer();
+        fileData = Buffer.from(fileBuffer).toString('base64');
+    } catch (error: any) {
+        console.error('Error fetching invoice file from URL:', error);
+        return res.status(500).json({ error: `Failed to retrieve invoice file from storage. ${error.message}` });
     }
 
     const apiKey = process.env.API_KEY;
