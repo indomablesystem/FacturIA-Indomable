@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Invoice, InvoiceData, View } from './types';
 import Header from './components/Header';
 import InvoiceUploader from './components/InvoiceUploader';
@@ -23,20 +23,33 @@ const App: React.FC = () => {
     const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const { t } = useLanguage();
+    const isInitialDataLoaded = useRef(false);
 
     useEffect(() => {
         if (user) {
+            isInitialDataLoaded.current = false; // Reset for new user login
             const unsubscribe = getInvoices(user.uid, (newInvoices) => {
                 setInvoices(newInvoices);
-                if (newInvoices.length === 0) {
+
+                // This logic runs only once when the data first loads for a user,
+                // or when the last invoice is deleted. It avoids overriding intentional
+                // view changes, like after an upload.
+                if (!isInitialDataLoaded.current) {
+                    if (newInvoices.length === 0) {
+                        setView(View.UPLOAD);
+                    } else {
+                        setView(View.DASHBOARD);
+                    }
+                    isInitialDataLoaded.current = true;
+                } else if (newInvoices.length === 0) {
+                    // Handle the case where the user deletes the last invoice
                     setView(View.UPLOAD);
-                } else {
-                    setView(View.DASHBOARD);
                 }
             });
             return () => unsubscribe();
         } else {
             setInvoices([]);
+            isInitialDataLoaded.current = false;
         }
     }, [user]);
 
@@ -113,10 +126,6 @@ const App: React.FC = () => {
     }
 
     const MainContent: React.FC = () => {
-        if (invoices.length === 0 && view !== View.UPLOAD) {
-             setView(View.UPLOAD); // Force upload view if no invoices exist
-        }
-
         if (invoices.length === 0) {
             return (
                 <div className="flex flex-col items-center justify-center h-full text-center p-8">
