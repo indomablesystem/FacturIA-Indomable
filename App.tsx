@@ -9,10 +9,9 @@ import Login from './components/Login';
 import InvoiceDetailModal from './components/InvoiceDetailModal';
 import { processInvoice, sendChatMessage } from './services/apiService';
 import { getInvoices, addInvoice, deleteInvoice as deleteInvoiceFromDb } from './services/firestoreService';
-import { BotIcon } from './components/icons';
+import { BotIcon, SpinnerIcon } from './components/icons';
 import { useLanguage } from './contexts/LanguageContext';
 import { useAuth } from './contexts/AuthContext';
-import { Unsubscribe } from 'firebase/firestore';
 
 const App: React.FC = () => {
     const { user, loadingAuth } = useAuth();
@@ -20,6 +19,7 @@ const App: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [view, setView] = useState<View>(View.DASHBOARD);
+    const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true);
     const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const { t } = useLanguage();
@@ -27,28 +27,25 @@ const App: React.FC = () => {
 
     useEffect(() => {
         if (user) {
+            setLoadingInvoices(true);
             isInitialDataLoaded.current = false; // Reset for new user login
             const unsubscribe = getInvoices(user.uid, (newInvoices) => {
-                setInvoices(newInvoices);
-
-                // This logic runs only once when the data first loads for a user,
-                // or when the last invoice is deleted. It avoids overriding intentional
-                // view changes, like after an upload.
-                if (!isInitialDataLoaded.current) {
-                    if (newInvoices.length === 0) {
+                setInvoices(prevInvoices => {
+                    if (!isInitialDataLoaded.current) {
+                        setView(newInvoices.length === 0 ? View.UPLOAD : View.DASHBOARD);
+                        isInitialDataLoaded.current = true;
+                    } else if (prevInvoices.length > 0 && newInvoices.length === 0) {
+                        // This handles deleting the last invoice
                         setView(View.UPLOAD);
-                    } else {
-                        setView(View.DASHBOARD);
                     }
-                    isInitialDataLoaded.current = true;
-                } else if (newInvoices.length === 0) {
-                    // Handle the case where the user deletes the last invoice
-                    setView(View.UPLOAD);
-                }
+                    return newInvoices;
+                });
+                setLoadingInvoices(false);
             });
             return () => unsubscribe();
         } else {
             setInvoices([]);
+            setLoadingInvoices(false);
             isInitialDataLoaded.current = false;
         }
     }, [user]);
@@ -129,7 +126,7 @@ const App: React.FC = () => {
         const hasInvoices = invoices.length > 0;
     
         return (
-            <div className="p-4 sm:p-6 lg:p-8 animate-fade-in">
+            <div className="p-4 sm:p-6 lg:p-8 animate-fade-in w-full">
                 {hasInvoices && (
                     <div className="flex space-x-2 mb-6 border-b border-gray-700">
                         <button onClick={() => setView(View.UPLOAD)} className={`py-2 px-4 font-medium transition-colors ${view === View.UPLOAD ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('upload_more')}</button>
@@ -166,8 +163,14 @@ const App: React.FC = () => {
     return (
         <div className="min-h-screen bg-primary flex flex-col">
             <Header />
-            <main className="flex-grow container mx-auto px-4">
-                <MainContent />
+            <main className="flex-grow container mx-auto px-4 flex">
+                {loadingInvoices ? (
+                    <div className="w-full flex justify-center items-center">
+                        <SpinnerIcon className="w-12 h-12 text-accent" />
+                    </div>
+                ) : (
+                    <MainContent />
+                )}
             </main>
             <button
                 onClick={() => setIsChatOpen(!isChatOpen)}
