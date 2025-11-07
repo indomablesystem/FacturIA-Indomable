@@ -22,58 +22,68 @@ import { processInvoice, sendChatMessage } from './services/apiService';
  * @returns A new array of fully sanitized Invoice objects.
  */
 const sanitizeInvoices = (invoices: any[]): Invoice[] => {
+    // CRITICAL FIX: Ensure the input is a processable array and filter out any nullish/invalid entries
+    // before mapping. This prevents the entire app from crashing if the fetched data contains
+    // corrupted records (e.g., null, undefined).
+    if (!Array.isArray(invoices)) {
+        console.error("Sanitization function received a non-array input:", invoices);
+        return [];
+    }
+
     const today = new Date().toISOString().split('T')[0];
 
-    return invoices.map(inv => {
-        // Universal date handler for 'date' field
-        const sanitizeDate = (dateField: any): string => {
-            if (!dateField) return today;
-            if (dateField.toDate && typeof dateField.toDate === 'function') { // Firestore Timestamp
-                try { return dateField.toDate().toISOString().split('T')[0]; } catch (e) { return today; }
-            }
-            if (dateField instanceof Date) { // JavaScript Date Object
-                 try { return dateField.toISOString().split('T')[0]; } catch (e) { return today; }
-            }
-            if (typeof dateField === 'string' && !isNaN(new Date(dateField).getTime())) { // Valid Date String
-                return dateField.split('T')[0];
-            }
-            return today; // Fallback for any invalid format
-        };
-        
-        // Universal date handler for 'dueDate' field (can be empty)
-        const sanitizeDueDate = (dateField: any): string => {
-             if (!dateField) return '';
-            if (dateField.toDate && typeof dateField.toDate === 'function') { // Firestore Timestamp
-                try { return dateField.toDate().toISOString().split('T')[0]; } catch (e) { return ''; }
-            }
-             if (dateField instanceof Date) { // JavaScript Date Object
-                try { return dateField.toISOString().split('T')[0]; } catch (e) { return ''; }
-            }
-            if (typeof dateField === 'string' && !isNaN(new Date(dateField).getTime())) { // Valid Date String
-                return dateField.split('T')[0];
-            }
-            return ''; // Fallback for any invalid format
-        };
+    return invoices
+        .filter(inv => inv && typeof inv === 'object') // This line prevents crashes from null/undefined items in the array.
+        .map(inv => {
+            // Universal date handler for 'date' field
+            const sanitizeDate = (dateField: any): string => {
+                if (!dateField) return today;
+                if (dateField.toDate && typeof dateField.toDate === 'function') { // Firestore Timestamp
+                    try { return dateField.toDate().toISOString().split('T')[0]; } catch (e) { return today; }
+                }
+                if (dateField instanceof Date) { // JavaScript Date Object
+                     try { return dateField.toISOString().split('T')[0]; } catch (e) { return today; }
+                }
+                if (typeof dateField === 'string' && !isNaN(new Date(dateField).getTime())) { // Valid Date String
+                    return dateField.split('T')[0];
+                }
+                return today; // Fallback for any invalid format
+            };
+            
+            // Universal date handler for 'dueDate' field (can be empty)
+            const sanitizeDueDate = (dateField: any): string => {
+                 if (!dateField) return '';
+                if (dateField.toDate && typeof dateField.toDate === 'function') { // Firestore Timestamp
+                    try { return dateField.toDate().toISOString().split('T')[0]; } catch (e) { return ''; }
+                }
+                 if (dateField instanceof Date) { // JavaScript Date Object
+                    try { return dateField.toISOString().split('T')[0]; } catch (e) { return ''; }
+                }
+                if (typeof dateField === 'string' && !isNaN(new Date(dateField).getTime())) { // Valid Date String
+                    return dateField.split('T')[0];
+                }
+                return ''; // Fallback for any invalid format
+            };
 
-        return {
-            id: inv.id || '',
-            fileName: inv.fileName || 'Unknown File',
-            cliente: inv.cliente || 'Cliente Desconocido',
-            invoiceNumber: inv.invoiceNumber || 'N/A',
-            date: sanitizeDate(inv.date),
-            dueDate: sanitizeDueDate(inv.dueDate),
-            totalAmount: Number(inv.totalAmount) || 0,
-            taxAmount: Number(inv.taxAmount) || 0,
-            irpfAmount: Number(inv.irpfAmount) || 0,
-            currency: inv.currency || 'EUR',
-            lineItems: Array.isArray(inv.lineItems) ? inv.lineItems.map(item => ({
-                description: item.description || '',
-                quantity: Number(item.quantity) || 0,
-                unitPrice: Number(item.unitPrice) || 0,
-                total: Number(item.total) || 0
-            })) : [],
-        };
-    });
+            return {
+                id: inv.id || '',
+                fileName: inv.fileName || 'Unknown File',
+                cliente: inv.cliente || 'Cliente Desconocido',
+                invoiceNumber: inv.invoiceNumber || 'N/A',
+                date: sanitizeDate(inv.date),
+                dueDate: sanitizeDueDate(inv.dueDate),
+                totalAmount: Number(inv.totalAmount) || 0,
+                taxAmount: Number(inv.taxAmount) || 0,
+                irpfAmount: Number(inv.irpfAmount) || 0,
+                currency: inv.currency || 'EUR',
+                lineItems: Array.isArray(inv.lineItems) ? inv.lineItems.map(item => ({
+                    description: item.description || '',
+                    quantity: Number(item.quantity) || 0,
+                    unitPrice: Number(item.unitPrice) || 0,
+                    total: Number(item.total) || 0
+                })) : [],
+            };
+        });
 };
 
 
