@@ -1,6 +1,42 @@
 // Vercel Serverless Function: /api/chat.ts
 import { GoogleGenAI } from "@google/genai";
-import { getAdminAuth, isInitialized } from './_utils/firebase-admin.js';
+
+/**
+ * Verifies a Firebase Auth ID token using Google's Identity Toolkit REST API.
+ * This avoids the need for the Firebase Admin SDK and service account credentials.
+ * @param token The ID token from the client.
+ * @returns A promise that resolves to true if the token is valid, false otherwise.
+ */
+async function verifyToken(token: string): Promise<boolean> {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        console.error("API_KEY environment variable is not set for token verification.");
+        return false;
+    }
+
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('Token verification failed:', errorData?.error?.message || 'Unknown error');
+            return false;
+        }
+        
+        // If the request succeeds with a 200 OK, the token is valid.
+        return true;
+
+    } catch (error) {
+        console.error('Network error during token verification:', error);
+        return false;
+    }
+}
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
@@ -8,25 +44,19 @@ export default async function handler(req: any, res: any) {
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
 
-    if (!isInitialized) {
-        console.error("Aborting chat request: Firebase Admin SDK is not initialized.");
-        return res.status(500).json({ error: 'Server configuration error: Could not connect to authentication service.' });
-    }
-
-    // Verify Firebase Authentication token
+    // Verify Firebase Authentication token using the simplified REST API method
     try {
         const token = req.headers.authorization?.split('Bearer ')[1];
         if (!token) {
             return res.status(401).json({ error: 'Unauthorized: No token provided.' });
         }
-        const auth = getAdminAuth();
-        if (!auth) {
-            return res.status(500).json({ error: 'Server configuration error: Authentication service is not available.' });
+        const isValid = await verifyToken(token);
+        if (!isValid) {
+            return res.status(401).json({ error: 'Unauthorized: Invalid token.' });
         }
-        await auth.verifyIdToken(token);
     } catch (error) {
-        console.error('Error verifying auth token:', error);
-        return res.status(401).json({ error: 'Unauthorized: Invalid token.' });
+        console.error('Error during token verification process:', error);
+        return res.status(500).json({ error: 'Internal server error during authentication.' });
     }
     
     const { message, invoicesContext } = req.body;
