@@ -2,19 +2,31 @@ import { initializeApp, FirebaseApp } from "firebase/app";
 
 let appPromise: Promise<FirebaseApp> | null = null;
 
+const fetchFirebaseConfig = async () => {
+    try {
+        const response = await fetch('/api/get-key');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Failed to fetch Firebase config: ${errorData.error || response.statusText}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching Firebase config:", error);
+        return null;
+    }
+};
+
 const initializeFirebase = async (): Promise<FirebaseApp> => {
-    // FIX: Cast import.meta to any to resolve TypeScript error with Vite env variables.
-    const configString = (import.meta as any).env.VITE_FIREBASE_CONFIG;
-    if (!configString) {
-        const errorMessage = "La configuración de Firebase no se ha encontrado. Asegúrate de que la variable de entorno VITE_FIREBASE_CONFIG esté correctamente configurada en Vercel.";
+    const firebaseConfig = await fetchFirebaseConfig();
+
+    if (!firebaseConfig) {
+        const errorMessage = "La configuración de Firebase no se pudo obtener del servidor. Asegúrate de que la variable de entorno FIREBASE_CONFIG esté correctamente configurada en Vercel.";
         console.error(errorMessage);
-        // Muestra un error claro en la pantalla si la variable no está configurada
         document.body.innerHTML = `<div style="color: white; padding: 20px; font-family: sans-serif; background: #0D0E1C; height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center;"><div><h1>Error de Configuración</h1><p>${errorMessage}</p><p>Por favor, revisa las instrucciones y la configuración de tu proyecto en Vercel.</p></div></div>`;
         throw new Error(errorMessage);
     }
 
     try {
-        const firebaseConfig = JSON.parse(configString);
         if (!firebaseConfig.apiKey) {
             throw new Error("La configuración de Firebase no es válida o le falta la apiKey.");
         }
