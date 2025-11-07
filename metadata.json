@@ -1,0 +1,5 @@
+{
+  "name": "Indomable FacturIA",
+  "description": "An intelligent invoice management web application that uses AI to automatically extract data from uploaded invoices. It features a futuristic dark-mode interface, a visual analytics dashboard, and a conversational AI assistant to help you understand your finances.",
+  "requestFramePermissions": []
+}
