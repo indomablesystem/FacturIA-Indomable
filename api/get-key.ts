@@ -14,16 +14,17 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ error: "Server configuration error: Firebase config not found." });
     }
 
-    // We will parse the JSON string on the server.
-    // If it's invalid, we catch the error and send a clear response.
-    // If it's valid, we re-serialize it with res.json() to ensure the client
-    // receives a perfectly formatted JSON object, free of any extra characters
-    // or whitespace that might have been in the original environment variable string.
+    // A common user error is to paste a JS object (with unquoted keys)
+    // instead of a valid JSON string. This correction step makes the endpoint
+    // more robust by adding quotes around unquoted keys before parsing.
+    const correctedJsonString = firebaseConfigString.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+
     try {
-        const configObject = JSON.parse(firebaseConfigString);
+        const configObject = JSON.parse(correctedJsonString);
         return res.status(200).json(configObject);
     } catch (e) {
-        console.error("FIREBASE_CONFIG is not valid JSON. Value:", firebaseConfigString);
+        console.error("FIREBASE_CONFIG is not valid JSON even after attempting correction. Original value:", firebaseConfigString);
+        console.error("Parsing error:", e);
         return res.status(500).json({ 
             error: "Server configuration error: The FIREBASE_CONFIG environment variable contains invalid JSON." 
         });
