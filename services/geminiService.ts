@@ -1,6 +1,43 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Invoice, ChatMessage } from '../types';
 
+// Caching mechanism to store the API key after fetching it once.
+let apiKeyPromise: Promise<string> | null = null;
+
+const getApiKey = (): Promise<string> => {
+    // If we already have a promise to fetch the key, return it to avoid multiple requests.
+    if (apiKeyPromise) {
+        return apiKeyPromise;
+    }
+
+    // In a browser environment where process.env is not available,
+    // we fetch the key from a secure serverless function.
+    // This function reads the API_KEY from Vercel's environment variables.
+    apiKeyPromise = fetch('/api/get-key')
+        .then(async (response) => {
+            const data = await response.json();
+            if (!response.ok) {
+                // Throw the user-friendly error from our serverless function if available.
+                throw new Error(data.error || `Error del servidor: ${response.status}`);
+            }
+            return data;
+        })
+        .then(data => {
+            if (!data.apiKey) {
+                throw new Error("La respuesta del servidor no contenía una API Key.");
+            }
+            // Once we have the key, we resolve the promise with it.
+            return data.apiKey;
+        })
+        .catch(err => {
+            // If fetching fails, clear the promise to allow for retries.
+            apiKeyPromise = null; 
+            throw err;
+        });
+    
+    return apiKeyPromise;
+};
+
 const fileToGenerativePart = async (file: File) => {
     const base64EncodedDataPromise = new Promise<string>((resolve) => {
         const reader = new FileReader();
@@ -43,7 +80,8 @@ const invoiceSchema = {
 
 
 export const extractInvoiceData = async (file: File): Promise<Omit<Invoice, 'id' | 'fileName'>> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = await getApiKey();
+    const ai = new GoogleGenAI({ apiKey: apiKey });
     
     if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
         throw new Error('Solo se admiten archivos de imagen y PDF para la extracción.');
@@ -72,7 +110,8 @@ export const extractInvoiceData = async (file: File): Promise<Omit<Invoice, 'id'
 };
 
 export const getChatbotResponse = async (history: ChatMessage[], invoices: Invoice[]): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = await getApiKey();
+    const ai = new GoogleGenAI({ apiKey: apiKey });
 
     const context = `
       Eres Indomable FacturIA, un asistente de contabilidad IA amigable y perspicaz.
