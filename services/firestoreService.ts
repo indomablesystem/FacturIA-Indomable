@@ -23,8 +23,7 @@ export const getInvoices = (
     getDb().then(db => {
         const q = query(
             collection(db, INVOICES_COLLECTION),
-            where("userId", "==", userId),
-            orderBy("date", "desc")
+            where("userId", "==", userId)
         );
         
         unsubscribe = onSnapshot(q, (querySnapshot) => {

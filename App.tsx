@@ -31,7 +31,9 @@ const App: React.FC = () => {
             isInitialDataLoaded.current = false; // Reset for new user login
             const unsubscribe = getInvoices(
                 user.uid, 
-                (newInvoices) => { // onSuccess callback
+                (unsortedInvoices) => { // onSuccess callback
+                    const newInvoices = unsortedInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
                     setInvoices(prevInvoices => {
                         if (!isInitialDataLoaded.current) {
                             setView(newInvoices.length === 0 ? View.UPLOAD : View.DASHBOARD);
