@@ -1,11 +1,11 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Invoice, ChatMessage } from '../types';
 
+// Fix: Use process.env.API_KEY as per coding guidelines to resolve the 'env' property error on 'ImportMeta'.
 const API_KEY = process.env.API_KEY;
 
 if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set.");
+    throw new Error("API_KEY environment variable not set. Please configure it in your deployment settings.");
 }
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
