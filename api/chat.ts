@@ -8,13 +8,28 @@ import { GoogleGenAI } from "@google/genai";
  * @returns A promise that resolves to true if the token is valid, false otherwise.
  */
 async function verifyToken(token: string): Promise<boolean> {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        console.error("API_KEY environment variable is not set for token verification.");
+    const firebaseConfigString = process.env.FIREBASE_CONFIG;
+    if (!firebaseConfigString) {
+        console.error("Server Error: FIREBASE_CONFIG environment variable is not set.");
         return false;
     }
 
-    const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`;
+    let firebaseApiKey;
+    try {
+        const correctedJsonString = firebaseConfigString.trim().replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+        const configObject = JSON.parse(correctedJsonString);
+        firebaseApiKey = configObject.apiKey;
+        if (!firebaseApiKey) {
+            console.error("Server Error: 'apiKey' not found in parsed FIREBASE_CONFIG.");
+            return false;
+        }
+    } catch (e) {
+        console.error("Server Error: Failed to parse FIREBASE_CONFIG to get apiKey:", e);
+        return false;
+    }
+
+
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`;
 
     try {
         const response = await fetch(url, {
@@ -25,7 +40,7 @@ async function verifyToken(token: string): Promise<boolean> {
 
         if (!response.ok) {
             const errorData = await response.json();
-            console.error('Token verification failed:', errorData?.error?.message || 'Unknown error');
+            console.error('Token verification failed:', errorData?.error?.message || 'Unknown error from Identity Toolkit');
             return false;
         }
         

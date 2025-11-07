@@ -32,7 +32,23 @@ const App: React.FC = () => {
             const unsubscribe = getInvoices(
                 user.uid, 
                 (unsortedInvoices) => { // onSuccess callback
-                    const newInvoices = unsortedInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    // Sanitize all incoming invoices to prevent crashes in child components
+                    // due to potentially missing fields from older data structures.
+                    const sanitizedInvoices = unsortedInvoices.map((inv): Invoice => ({
+                        id: inv.id || 'missing-id',
+                        fileName: inv.fileName || 'N/A',
+                        cliente: inv.cliente || 'Cliente Desconocido',
+                        invoiceNumber: inv.invoiceNumber || 'N/A',
+                        date: inv.date || new Date().toISOString().split('T')[0],
+                        dueDate: inv.dueDate || '',
+                        totalAmount: typeof inv.totalAmount === 'number' ? inv.totalAmount : 0,
+                        taxAmount: typeof inv.taxAmount === 'number' ? inv.taxAmount : 0,
+                        irpfAmount: typeof inv.irpfAmount === 'number' ? inv.irpfAmount : 0,
+                        currency: inv.currency || 'EUR',
+                        lineItems: Array.isArray(inv.lineItems) ? inv.lineItems : [],
+                    }));
+
+                    const newInvoices = sanitizedInvoices.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
                     setInvoices(prevInvoices => {
                         if (!isInitialDataLoaded.current) {
@@ -143,7 +159,7 @@ const App: React.FC = () => {
         const hasInvoices = invoices.length > 0;
 
         // If there's an error, display it prominently.
-        if (error) {
+        if (error && !isProcessing) { // Only show general errors if not processing a file
              return <div className="w-full flex justify-center items-center text-center">
                 <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto">
                     <strong className="font-bold">Error de Carga</strong>
@@ -184,6 +200,13 @@ const App: React.FC = () => {
                 </div>
     
                 {isProcessing && error && <p className="text-red-400 mt-4 animate-fade-in text-center">{error}</p>}
+                 {error && isProcessing && ( // Show processing-specific error under the uploader
+                    <div className="w-full flex justify-center items-center text-center mt-4">
+                        <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto">
+                           <p>{error}</p>
+                        </div>
+                    </div>
+                 )}
             </div>
         );
     };
