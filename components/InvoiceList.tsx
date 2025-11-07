@@ -3,6 +3,7 @@ import { Invoice } from '../types';
 import { DownloadIcon, SearchIcon, EyeIcon, TrashIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
 
+// FIX: Defined the InvoiceListProps interface to type the component's props.
 interface InvoiceListProps {
     invoices: Invoice[];
     onView: (invoice: Invoice) => void;
@@ -28,18 +29,48 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete })
     const { language, t } = useLanguage();
 
     const filteredInvoices = useMemo(() => {
-        const safeGetTime = (dateStr: string) => {
+        // Robust date parsing for sorting. Handles invalid dates gracefully.
+        const safeGetTime = (dateStr: any): number => {
             if (!dateStr || typeof dateStr !== 'string') return 0;
             const date = new Date(dateStr);
+            // Check if date is valid
             return isNaN(date.getTime()) ? 0 : date.getTime();
         };
 
-        return invoices.filter(invoice =>
-            invoice.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (invoice.lineItems && invoice.lineItems.some(item => item.description.toLowerCase().includes(searchTerm.toLowerCase())))
-        ).sort((a, b) => safeGetTime(b.date) - safeGetTime(a.date));
+        // Defensive filtering to prevent crashes from malformed invoice objects.
+        const defensivelyFiltered = invoices.filter(invoice => {
+            if (!invoice) return false; // Guard against null/undefined items in the array
+            try {
+                const term = searchTerm.toLowerCase();
+
+                const clientMatch = invoice.cliente && typeof invoice.cliente === 'string' 
+                    ? invoice.cliente.toLowerCase().includes(term)
+                    : false;
+
+                const numberMatch = invoice.invoiceNumber && typeof invoice.invoiceNumber === 'string'
+                    ? invoice.invoiceNumber.toLowerCase().includes(term)
+                    : false;
+
+                const lineItemsMatch = Array.isArray(invoice.lineItems)
+                    ? invoice.lineItems.some(item =>
+                        item && item.description && typeof item.description === 'string'
+                            ? item.description.toLowerCase().includes(term)
+                            : false
+                      )
+                    : false;
+
+                return clientMatch || numberMatch || lineItemsMatch;
+            } catch (e) {
+                console.error("Error filtering an invoice, skipping it:", invoice, e);
+                return false; // Exclude problematic invoice from the list
+            }
+        });
+
+        // Sort the defensively filtered results.
+        return defensivelyFiltered.sort((a, b) => safeGetTime(b.date) - safeGetTime(a.date));
+
     }, [invoices, searchTerm]);
+
 
     const exportToCSV = () => {
         const headers = ['Cliente', 'Nº Factura', 'Fecha', 'Vencimiento', 'Total', 'Impuestos', 'IRPF', 'Moneda', 'Nombre Archivo'];
