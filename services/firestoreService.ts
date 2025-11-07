@@ -32,10 +32,15 @@ export const getInvoices = (
                 invoices.push({ id: doc.id, ...doc.data() } as Invoice);
             });
             onSuccess(invoices);
-        }, (error) => {
+        }, (error: any) => {
             console.error("Error fetching invoices from onSnapshot:", error);
-            // This is often a permission error. Guide the user.
-            onError(new Error("No se pudo conectar con la base de datos. Verifica tus reglas de seguridad en Firestore."));
+            if (error.code === 'permission-denied') {
+                // This is the most common error. Provide a very specific message.
+                onError(new Error("Permiso denegado por Firestore al leer las facturas. Esto casi siempre se debe a las reglas de seguridad. Asegúrate de que permitan la lectura para los dueños de los datos. Ejemplo: 'allow read: if request.auth.uid == resource.data.userId;'"));
+            } else {
+                // Generic error for other issues (e.g., network, missing index)
+                onError(new Error("No se pudo conectar con la base de datos para leer las facturas. Verifica tu conexión y la configuración de Firestore."));
+            }
         });
     }).catch(error => {
         console.error("Failed to get Firestore instance for getInvoices:", error);
