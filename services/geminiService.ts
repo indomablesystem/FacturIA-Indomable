@@ -1,14 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Invoice, ChatMessage } from '../types';
 
-// Fix: Use process.env.API_KEY as per the coding guidelines.
-if (!process.env.API_KEY) {
-    // This error will be caught during the build process if the variable isn't set,
-    // or will appear in the browser console if it's somehow missed.
-    console.error("API_KEY environment variable not set.");
-    throw new Error("La configuración de la API Key no se ha encontrado. Asegúrate de configurarla en los ajustes de despliegue de Vercel.");
-}
-
+// FIX: Per coding guidelines, the API key must be obtained from process.env.API_KEY and used to initialize GoogleGenAI directly.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const fileToGenerativePart = async (file: File) => {
