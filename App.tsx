@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Invoice, View } from './types';
+import { Invoice, InvoiceData, View } from './types';
 import Header from './components/Header';
 import InvoiceUploader from './components/InvoiceUploader';
 import InvoiceList from './components/InvoiceList';
@@ -58,7 +58,22 @@ const App: React.FC = () => {
         setError(null);
         try {
             const extractedData = await processInvoice(file);
-            await addInvoice(user.uid, { ...extractedData, fileName: file.name });
+            
+            // Sanitize data before saving to prevent Firestore errors from undefined values
+            const newInvoiceData: InvoiceData = {
+                fileName: file.name,
+                cliente: extractedData.cliente || 'N/A',
+                invoiceNumber: extractedData.invoiceNumber || 'N/A',
+                date: extractedData.date || new Date().toISOString().split('T')[0],
+                dueDate: extractedData.dueDate || '',
+                totalAmount: extractedData.totalAmount || 0,
+                taxAmount: extractedData.taxAmount || 0,
+                irpfAmount: extractedData.irpfAmount || 0,
+                currency: extractedData.currency || 'EUR',
+                lineItems: extractedData.lineItems || [],
+            };
+
+            await addInvoice(user.uid, newInvoiceData);
             setView(View.DASHBOARD);
         } catch (err) {
             console.error(err);
