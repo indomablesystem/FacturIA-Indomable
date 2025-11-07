@@ -38,6 +38,7 @@ export const translations: Translations = {
         'delete_invoice': 'Eliminar factura',
         'no_invoices_found': 'No se encontraron facturas.',
         'download_original_invoice': 'Descargar factura original',
+        'download_unavailable': 'El archivo original no está disponible para facturas antiguas.',
         // Modal
         'invoice_details': 'Detalles de la Factura',
         'issue_date': 'Fecha Emisión',
@@ -93,6 +94,7 @@ export const translations: Translations = {
         'delete_invoice': 'Delete invoice',
         'no_invoices_found': 'No invoices found.',
         'download_original_invoice': 'Download original invoice',
+        'download_unavailable': 'Original file not available for older invoices.',
         // Modal
         'invoice_details': 'Invoice Details',
         'issue_date': 'Issue Date',

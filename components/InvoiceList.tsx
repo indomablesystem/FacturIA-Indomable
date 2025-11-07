@@ -159,7 +159,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete })
                                 <td className="p-3 text-right font-semibold text-white">{safeFormatCurrency(invoice.totalAmount, invoice.currency, locale)}</td>
                                 <td className="p-3 text-center">
                                     <div className="flex justify-center items-center gap-3">
-                                        {invoice.downloadUrl && (
+                                        {invoice.downloadUrl ? (
                                             <a
                                                 href={invoice.downloadUrl}
                                                 target="_blank"
@@ -171,6 +171,14 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ invoices, onView, onDelete })
                                             >
                                                 <DownloadIcon />
                                             </a>
+                                        ) : (
+                                            <span 
+                                                className="text-gray-600 p-1 rounded-full cursor-not-allowed" 
+                                                title={t('download_unavailable')}
+                                                aria-label={t('download_unavailable')}
+                                            >
+                                                <DownloadIcon />
+                                            </span>
                                         )}
                                         <button 
                                             onClick={() => onView(invoice)} 
