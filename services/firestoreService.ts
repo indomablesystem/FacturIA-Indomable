@@ -56,9 +56,12 @@ export const addInvoice = async (userId: string, invoiceData: InvoiceData): Prom
             createdAt: serverTimestamp()
         });
         return docRef.id;
-    } catch (e) {
-        console.error("Error adding document: ", e);
-        throw new Error("Could not save invoice to the database.");
+    } catch (e: any) {
+        console.error("Error adding document to Firestore: ", e);
+        if (e && e.code === 'permission-denied') {
+            throw new Error("Permiso denegado por Firestore. Por favor, revisa tus reglas de seguridad para permitir que los usuarios autenticados escriban en la colección 'invoices'.");
+        }
+        throw new Error("No se pudo guardar la factura en la base de datos.");
     }
 };
 
@@ -67,8 +70,11 @@ export const deleteInvoice = async (userId: string, invoiceId: string): Promise<
     try {
         const invoiceRef = doc(db, INVOICES_COLLECTION, invoiceId);
         await deleteDoc(invoiceRef);
-    } catch (e) {
-        console.error("Error deleting document: ", e);
-        throw new Error("Could not delete invoice from the database.");
+    } catch (e: any) {
+        console.error("Error deleting document from Firestore: ", e);
+        if (e && e.code === 'permission-denied') {
+             throw new Error("Permiso denegado por Firestore. No se pudo eliminar la factura. Revisa tus reglas de seguridad.");
+        }
+        throw new Error("No se pudo eliminar la factura de la base de datos.");
     }
 };
