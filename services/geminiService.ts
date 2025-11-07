@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Invoice, ChatMessage } from '../types';
 
-// FIX: Per coding guidelines, the API key must be obtained from process.env.API_KEY and used to initialize GoogleGenAI directly.
+// Fix: Use process.env.API_KEY as per the guidelines.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const fileToGenerativePart = async (file: File) => {
