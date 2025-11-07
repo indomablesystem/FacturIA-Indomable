@@ -25,21 +25,34 @@ const getStorageInstance = async (): Promise<Storage> => {
     return storageInstance;
 }
 
-export const uploadInvoiceFile = async (userId: string, file: File): Promise<string> => {
-    const storage = await getStorageInstance();
-    // Create a unique path for the file to prevent overwrites
-    const filePath = `${INVOICE_FILES_FOLDER}/${userId}/${Date.now()}-${file.name}`;
-    const fileRef = ref(storage, filePath);
+export const uploadInvoiceFile = (userId: string, file: File): Promise<string> => {
+    const UPLOAD_TIMEOUT_MS = 25000; // 25-second timeout to match API service
 
-    try {
-        const snapshot = await uploadBytes(fileRef, file);
-        const downloadUrl = await getDownloadURL(snapshot.ref);
-        return downloadUrl;
-    } catch (error) {
-        console.error("Error uploading file to Firebase Storage:", error);
-        throw new Error("Failed to upload the invoice file. Please check Firebase Storage rules.");
-    }
+    const uploadOperation = async (): Promise<string> => {
+        try {
+            const storage = await getStorageInstance();
+            // Create a unique path for the file to prevent overwrites
+            const filePath = `${INVOICE_FILES_FOLDER}/${userId}/${Date.now()}-${file.name}`;
+            const fileRef = ref(storage, filePath);
+            const snapshot = await uploadBytes(fileRef, file);
+            return await getDownloadURL(snapshot.ref);
+        } catch (error) {
+            console.error("Error uploading file to Firebase Storage:", error);
+            // Providing a more specific, user-facing error message is crucial for debugging.
+            // Firebase Storage errors often relate to security rules.
+            throw new Error("No se pudo subir el archivo original. Verifica tus reglas de seguridad en Firebase Storage y tu conexión a internet.");
+        }
+    };
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+            reject(new Error('La subida del archivo original tardó demasiado (25s) y fue cancelada. Esto puede ocurrir con conexiones lentas.'));
+        }, UPLOAD_TIMEOUT_MS);
+    });
+
+    return Promise.race([uploadOperation(), timeoutPromise]);
 };
+
 
 export const getInvoices = (
     userId: string, 
