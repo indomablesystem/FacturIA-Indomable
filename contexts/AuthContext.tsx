@@ -6,6 +6,7 @@ interface AuthContextType {
     user: User | null;
     loadingAuth: boolean;
     initError: string | null;
+    loginError: string | null;
     login: () => Promise<void>;
     logout: () => Promise<void>;
 }
@@ -17,6 +18,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loadingAuth, setLoadingAuth] = useState(true);
     const [authInstance, setAuthInstance] = useState<Auth | null>(null);
     const [initError, setInitError] = useState<string | null>(null);
+    const [loginError, setLoginError] = useState<string | null>(null);
 
     useEffect(() => {
         let unsubscribe: (() => void) | undefined;
@@ -52,11 +54,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setInitError("El servicio de autenticación no está listo. Por favor, refresca la página.");
             return;
         }
+        setLoginError(null); // Clear previous login errors
         const provider = new GoogleAuthProvider();
         try {
             await signInWithPopup(authInstance, provider);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error durante el inicio de sesión con Google", error);
+            let errorMessage = "Ocurrió un error al intentar iniciar sesión.";
+            if (error.code === 'auth/operation-not-allowed') {
+                 errorMessage = "El inicio de sesión con Google no está habilitado. Por favor, actívalo en la consola de Firebase.";
+            } else if (error.code === 'auth/auth-domain-config-error') {
+                 errorMessage = `El dominio de esta aplicación no está autorizado. Añade '${window.location.hostname}' a la lista de dominios autorizados en la configuración de autenticación de Firebase.`;
+            }
+            setLoginError(errorMessage);
         }
     };
 
@@ -70,7 +80,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <AuthContext.Provider value={{ user, loadingAuth, initError, login, logout }}>
+        <AuthContext.Provider value={{ user, loadingAuth, initError, loginError, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

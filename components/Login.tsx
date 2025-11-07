@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { GoogleIcon } from './icons';
 
 const Login: React.FC = () => {
-    const { login, initError } = useAuth();
+    const { login, initError, loginError } = useAuth();
 
     return (
         <div className="min-h-screen bg-primary flex flex-col items-center justify-center animate-fade-in">
@@ -30,6 +30,12 @@ const Login: React.FC = () => {
                         <GoogleIcon />
                         <span>Iniciar Sesión con Google</span>
                     </button>
+                )}
+                {loginError && (
+                    <div className="mt-4 bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto animate-fade-in" role="alert">
+                         <strong className="font-bold">Error al Iniciar Sesión</strong>
+                        <span className="block mt-1">{loginError}</span>
+                    </div>
                 )}
             </div>
         </div>
