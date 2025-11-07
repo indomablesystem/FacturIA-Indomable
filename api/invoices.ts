@@ -1,12 +1,17 @@
 // Vercel Serverless Function: /api/invoices.ts
 import { GoogleGenAI, Type } from "@google/genai";
-import admin from './_utils/firebase-admin';
+import { admin, isInitialized } from './_utils/firebase-admin';
 
 // This function is the single entry point for invoice processing.
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    }
+
+    if (!isInitialized) {
+        console.error("Aborting invoice processing: Firebase Admin SDK is not initialized.");
+        return res.status(500).json({ error: 'Server configuration error: Could not connect to authentication service.' });
     }
 
     // Verify Firebase Authentication token

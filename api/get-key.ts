@@ -23,10 +23,10 @@ export default async function handler(req: any, res: any) {
     try {
         const configObject = JSON.parse(correctedJsonString);
         
-        // Explicitly set headers and send stringified JSON to be more robust
-        // than relying on the res.json() shortcut.
-        res.setHeader('Content-Type', 'application/json');
-        return res.status(200).send(JSON.stringify(configObject));
+        // Use res.json() to correctly set headers and stringify the object.
+        // This is more robust than manually setting headers and calling JSON.stringify.
+        return res.status(200).json(configObject);
+        
     } catch (e) {
         console.error("FIREBASE_CONFIG is not valid JSON even after attempting correction. Original value:", firebaseConfigString);
         console.error("Parsing error:", e);

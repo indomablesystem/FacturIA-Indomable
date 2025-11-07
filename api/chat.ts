@@ -1,11 +1,16 @@
 // Vercel Serverless Function: /api/chat.ts
 import { GoogleGenAI } from "@google/genai";
-import admin from './_utils/firebase-admin';
+import { admin, isInitialized } from './_utils/firebase-admin';
 
 export default async function handler(req: any, res: any) {
     if (req.method !== 'POST') {
         res.setHeader('Allow', ['POST']);
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    }
+
+    if (!isInitialized) {
+        console.error("Aborting chat request: Firebase Admin SDK is not initialized.");
+        return res.status(500).json({ error: 'Server configuration error: Could not connect to authentication service.' });
     }
 
     // Verify Firebase Authentication token
