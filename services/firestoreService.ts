@@ -13,7 +13,11 @@ const getDb = async (): Promise<Firestore> => {
     return dbInstance;
 }
 
-export const getInvoices = (userId: string, callback: (invoices: Invoice[]) => void) => {
+export const getInvoices = (
+    userId: string, 
+    onSuccess: (invoices: Invoice[]) => void,
+    onError: (error: Error) => void
+) => {
     let unsubscribe: () => void = () => {};
     
     getDb().then(db => {
@@ -28,16 +32,21 @@ export const getInvoices = (userId: string, callback: (invoices: Invoice[]) => v
             querySnapshot.forEach((doc) => {
                 invoices.push({ id: doc.id, ...doc.data() } as Invoice);
             });
-            callback(invoices);
+            onSuccess(invoices);
         }, (error) => {
-            console.error("Error fetching invoices:", error);
+            console.error("Error fetching invoices from onSnapshot:", error);
+            // This is often a permission error. Guide the user.
+            onError(new Error("No se pudo conectar con la base de datos. Verifica tus reglas de seguridad en Firestore."));
         });
     }).catch(error => {
-        console.error("Failed to get Firestore instance for getInvoices", error);
+        console.error("Failed to get Firestore instance for getInvoices:", error);
+        onError(new Error("Error de inicialización de la base de datos."));
     });
 
+    // This returned function is called by useEffect when the component unmounts.
     return () => unsubscribe();
 };
+
 
 export const addInvoice = async (userId: string, invoiceData: InvoiceData): Promise<string> => {
     const db = await getDb();

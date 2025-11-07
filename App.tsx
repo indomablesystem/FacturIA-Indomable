@@ -18,7 +18,7 @@ const App: React.FC = () => {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isProcessing, setIsProcessing] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    const [view, setView] = useState<View>(View.DASHBOARD);
+    const [view, setView] = useState<View>(View.UPLOAD);
     const [loadingInvoices, setLoadingInvoices] = useState<boolean>(true);
     const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -29,26 +29,34 @@ const App: React.FC = () => {
         if (user) {
             setLoadingInvoices(true);
             isInitialDataLoaded.current = false; // Reset for new user login
-            const unsubscribe = getInvoices(user.uid, (newInvoices) => {
-                setInvoices(prevInvoices => {
-                    if (!isInitialDataLoaded.current) {
-                        setView(newInvoices.length === 0 ? View.UPLOAD : View.DASHBOARD);
-                        isInitialDataLoaded.current = true;
-                    } else if (prevInvoices.length > 0 && newInvoices.length === 0) {
-                        // This handles deleting the last invoice
-                        setView(View.UPLOAD);
-                    }
-                    return newInvoices;
-                });
-                setLoadingInvoices(false);
-            });
+            const unsubscribe = getInvoices(
+                user.uid, 
+                (newInvoices) => { // onSuccess callback
+                    setInvoices(prevInvoices => {
+                        if (!isInitialDataLoaded.current) {
+                            setView(newInvoices.length === 0 ? View.UPLOAD : View.DASHBOARD);
+                            isInitialDataLoaded.current = true;
+                        } else if (prevInvoices.length > 0 && newInvoices.length === 0) {
+                            setView(View.UPLOAD);
+                        }
+                        return newInvoices;
+                    });
+                    setLoadingInvoices(false);
+                    setError(null); // Clear previous errors on success
+                },
+                (err) => { // onError callback
+                    console.error("Firestore error:", err);
+                    setError(err.message);
+                    setLoadingInvoices(false);
+                }
+            );
             return () => unsubscribe();
-        } else {
+        } else if (!loadingAuth) {
             setInvoices([]);
             setLoadingInvoices(false);
             isInitialDataLoaded.current = false;
         }
-    }, [user]);
+    }, [user, loadingAuth]);
 
     const handleFileUpload = useCallback(async (file: File) => {
         if (!user) {
@@ -115,7 +123,14 @@ const App: React.FC = () => {
     }
 
     if (loadingAuth) {
-        return <div className="min-h-screen bg-primary flex items-center justify-center text-white">Cargando...</div>;
+        return (
+             <div className="min-h-screen bg-primary flex items-center justify-center text-white">
+                <div className="text-center">
+                    <SpinnerIcon className="w-12 h-12 mx-auto text-accent"/>
+                    <p className="mt-4 text-lg">Autenticando...</p>
+                </div>
+            </div>
+        );
     }
     
     if (!user) {
@@ -124,6 +139,17 @@ const App: React.FC = () => {
 
     const MainContent: React.FC = () => {
         const hasInvoices = invoices.length > 0;
+
+        // If there's an error, display it prominently.
+        if (error) {
+             return <div className="w-full flex justify-center items-center text-center">
+                <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg max-w-md mx-auto">
+                    <strong className="font-bold">Error de Carga</strong>
+                    <span className="block mt-1">{error}</span>
+                    <p className="text-xs mt-2 text-gray-400">Intenta refrescar la página. Si el problema persiste, revisa las reglas de seguridad de Firestore.</p>
+                </div>
+            </div>;
+        }
     
         return (
             <div className="p-4 sm:p-6 lg:p-8 animate-fade-in w-full">
@@ -136,7 +162,7 @@ const App: React.FC = () => {
                 )}
     
                 {/* Content Area */}
-                <div className={!hasInvoices ? "flex flex-col items-center justify-center text-center" : ""}>
+                <div className={!hasInvoices && view === View.UPLOAD ? "flex flex-col items-center justify-center text-center h-full" : ""}>
                     {view === View.UPLOAD && (
                         <>
                             {!hasInvoices && (
@@ -151,11 +177,11 @@ const App: React.FC = () => {
                         </>
                     )}
                     
-                    {view === View.DASHBOARD && <Dashboard invoices={invoices} />}
-                    {view === View.INVOICES && <InvoiceList invoices={invoices} onView={handleViewInvoice} onDelete={handleDeleteInvoice} />}
+                    {view === View.DASHBOARD && hasInvoices && <Dashboard invoices={invoices} />}
+                    {view === View.INVOICES && hasInvoices && <InvoiceList invoices={invoices} onView={handleViewInvoice} onDelete={handleDeleteInvoice} />}
                 </div>
     
-                {error && <p className="text-red-400 mt-4 animate-fade-in text-center">{error}</p>}
+                {isProcessing && error && <p className="text-red-400 mt-4 animate-fade-in text-center">{error}</p>}
             </div>
         );
     };
