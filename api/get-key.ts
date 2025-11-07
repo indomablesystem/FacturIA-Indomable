@@ -17,11 +17,16 @@ export default async function handler(req: any, res: any) {
     // A common user error is to paste a JS object (with unquoted keys)
     // instead of a valid JSON string. This correction step makes the endpoint
     // more robust by adding quotes around unquoted keys before parsing.
-    const correctedJsonString = firebaseConfigString.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+    // .trim() is added to remove potential leading/trailing whitespace.
+    const correctedJsonString = firebaseConfigString.trim().replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
 
     try {
         const configObject = JSON.parse(correctedJsonString);
-        return res.status(200).json(configObject);
+        
+        // Explicitly set headers and send stringified JSON to be more robust
+        // than relying on the res.json() shortcut.
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(200).send(JSON.stringify(configObject));
     } catch (e) {
         console.error("FIREBASE_CONFIG is not valid JSON even after attempting correction. Original value:", firebaseConfigString);
         console.error("Parsing error:", e);

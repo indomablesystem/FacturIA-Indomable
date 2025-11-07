@@ -5,6 +5,7 @@ import { getFirebaseApp } from '../firebase/config';
 interface AuthContextType {
     user: User | null;
     loadingAuth: boolean;
+    initError: string | null;
     login: () => Promise<void>;
     logout: () => Promise<void>;
 }
@@ -15,6 +16,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [user, setUser] = useState<User | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
     const [authInstance, setAuthInstance] = useState<Auth | null>(null);
+    const [initError, setInitError] = useState<string | null>(null);
 
     useEffect(() => {
         getFirebaseApp()
@@ -22,7 +24,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const auth = getAuth(app);
                 setAuthInstance(auth);
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    // Se ha eliminado la comprobación de correo electrónico: ahora se permite a cualquier usuario autenticado.
                     setUser(currentUser);
                     setLoadingAuth(false);
                 });
@@ -30,12 +31,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             })
             .catch(err => {
                 console.error("Failed to initialize Firebase Auth", err);
+                setInitError("No se pudo inicializar la autenticación. Revisa la configuración del proyecto en Vercel.");
                 setLoadingAuth(false);
             });
     }, []);
 
     const login = async () => {
-        if (!authInstance) return;
+        if (!authInstance) {
+            console.error("Intento de login fallido: la instancia de autenticación no está lista.");
+            return;
+        }
         const provider = new GoogleAuthProvider();
         try {
             await signInWithPopup(authInstance, provider);
@@ -54,7 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <AuthContext.Provider value={{ user, loadingAuth, login, logout }}>
+        <AuthContext.Provider value={{ user, loadingAuth, initError, login, logout }}>
             {children}
         </AuthContext.Provider>
     );
