@@ -126,32 +126,38 @@ const App: React.FC = () => {
     }
 
     const MainContent: React.FC = () => {
-        if (invoices.length === 0) {
-            return (
-                <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                    <div className="max-w-2xl">
-                        <h2 className="text-4xl font-bold mb-4 text-white">{t('welcome_title')}</h2>
-                        <p className="text-lg text-gray-300 mb-8">
-                           {t('welcome_subtitle')}
-                        </p>
-                        <InvoiceUploader onFileUpload={handleFileUpload} isProcessing={isProcessing} />
-                        {error && <p className="text-red-400 mt-4 animate-fade-in">{error}</p>}
-                    </div>
-                </div>
-            );
-        }
-
+        const hasInvoices = invoices.length > 0;
+    
         return (
             <div className="p-4 sm:p-6 lg:p-8 animate-fade-in">
-                <div className="flex space-x-2 mb-6 border-b border-gray-700">
-                    <button onClick={() => setView(View.UPLOAD)} className={`py-2 px-4 font-medium transition-colors ${view === View.UPLOAD ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('upload_more')}</button>
-                    <button onClick={() => setView(View.DASHBOARD)} className={`py-2 px-4 font-medium transition-colors ${view === View.DASHBOARD ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('dashboard')}</button>
-                    <button onClick={() => setView(View.INVOICES)} className={`py-2 px-4 font-medium transition-colors ${view === View.INVOICES ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('all_invoices')}</button>
+                {hasInvoices && (
+                    <div className="flex space-x-2 mb-6 border-b border-gray-700">
+                        <button onClick={() => setView(View.UPLOAD)} className={`py-2 px-4 font-medium transition-colors ${view === View.UPLOAD ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('upload_more')}</button>
+                        <button onClick={() => setView(View.DASHBOARD)} className={`py-2 px-4 font-medium transition-colors ${view === View.DASHBOARD ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('dashboard')}</button>
+                        <button onClick={() => setView(View.INVOICES)} className={`py-2 px-4 font-medium transition-colors ${view === View.INVOICES ? 'text-accent border-b-2 border-accent' : 'text-gray-400 hover:text-white'}`}>{t('all_invoices')}</button>
+                    </div>
+                )}
+    
+                {/* Content Area */}
+                <div className={!hasInvoices ? "flex flex-col items-center justify-center text-center" : ""}>
+                    {view === View.UPLOAD && (
+                        <>
+                            {!hasInvoices && (
+                                <div className="max-w-2xl mb-8">
+                                    <h2 className="text-4xl font-bold mb-4 text-white">{t('welcome_title')}</h2>
+                                    <p className="text-lg text-gray-300 mb-8">
+                                       {t('welcome_subtitle')}
+                                    </p>
+                                </div>
+                            )}
+                            <InvoiceUploader onFileUpload={handleFileUpload} isProcessing={isProcessing} />
+                        </>
+                    )}
+                    
+                    {view === View.DASHBOARD && <Dashboard invoices={invoices} />}
+                    {view === View.INVOICES && <InvoiceList invoices={invoices} onView={handleViewInvoice} onDelete={handleDeleteInvoice} />}
                 </div>
-
-                {view === View.UPLOAD && <InvoiceUploader onFileUpload={handleFileUpload} isProcessing={isProcessing} />}
-                {view === View.DASHBOARD && <Dashboard invoices={invoices} />}
-                {view === View.INVOICES && <InvoiceList invoices={invoices} onView={handleViewInvoice} onDelete={handleDeleteInvoice} />}
+    
                 {error && <p className="text-red-400 mt-4 animate-fade-in text-center">{error}</p>}
             </div>
         );
