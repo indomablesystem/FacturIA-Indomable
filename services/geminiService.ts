@@ -1,14 +1,15 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Invoice, ChatMessage } from '../types';
 
-// Fix: Use process.env.API_KEY as per coding guidelines to resolve the 'env' property error on 'ImportMeta'.
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-    throw new Error("API_KEY environment variable not set. Please configure it in your deployment settings.");
+// Fix: Use process.env.API_KEY as per the coding guidelines.
+if (!process.env.API_KEY) {
+    // This error will be caught during the build process if the variable isn't set,
+    // or will appear in the browser console if it's somehow missed.
+    console.error("API_KEY environment variable not set.");
+    throw new Error("La configuración de la API Key no se ha encontrado. Asegúrate de configurarla en los ajustes de despliegue de Vercel.");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const fileToGenerativePart = async (file: File) => {
     const base64EncodedDataPromise = new Promise<string>((resolve) => {
