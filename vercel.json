@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "api/invoices.ts": {
+      "memory": 1024
+    },
+    "api/chat.ts": {
+        "memory": 1024
+    }
+  }
+}

@@ -2,7 +2,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirebaseApp } from '../firebase/config';
 import { Invoice } from '../types';
 
-const API_TIMEOUT_MS = 15000; // 15-second client-side timeout
+const API_TIMEOUT_MS = 25000; // 25-second client-side timeout
 
 const getAuthToken = async (): Promise<string> => {
     const app = await getFirebaseApp();
